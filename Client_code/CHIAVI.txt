@@ -1,0 +1,31 @@
+COORDINATOR:
+Your p2p private key (hex):    0025a0656a21766dd512e433e8948f5737ce55f5a92f1180914509b4f97dbfb6af43b817ba232eb957c0ba1518a5c64a6282bd093b4f717bab2c75af1cbdb131
+Your p2p public key (hex):     af43b817ba232eb957c0ba1518a5c64a6282bd093b4f717bab2c75af1cbdb131
+Your p2p public key (base58):  CoAEpRMSqASReXfj28H7iBF5bJWWytP23JBLsgqbBmGk
+Your p2p PeerID:               12D3KooWMcXQZYwA24hv4RB9ej2TUyKv5dZA1aTVztYNFfzV5hzg
+
+
+KEY-PAIR:
+Your seed BIP39 mnemonic:  output one monster aerobic assist peace small tired glow alone thought skirt very switch oval glue lunch airport permit trick purse aspect toward sample
+
+Your BIP32 path:           m/44'/4218'/0'/0'/0'
+Your ed25519 private key:  5fb55005dd7845532371fe091958e290c631b9f3b0d647fde5ec36203bd8b509bd1a8b135358940a502d80d0965ec50146dab7eca4c538744145fc5c3c6cdd80
+Your ed25519 public key:   bd1a8b135358940a502d80d0965ec50146dab7eca4c538744145fc5c3c6cdd80
+Your ed25519 address:      b0b7889d2fa3ec552a5381a83af6833d3329cd771aaa327f58578bf7fa1f9f61
+Your bech32 address:       atoi1qzct0zya9737c4f22wq6swhksv7nx2wdwud25vnltptchal6r70kz89gc53
+
+ADDRESS:
+b0b7889d2fa3ec552a5381a83af6833d3329cd771aaa327f58578bf7fa1f9f61
+
+
+NODE1:
+Your p2p private key (hex):    f1942e5d51dc364b68260d8ab4ec6d7fa8a7c51953723d5fae9ec0783e8d72a147716554694f6e4d740285107b38d493578810db9e514fd13e11feb6392f6ed3
+Your p2p public key (hex):     47716554694f6e4d740285107b38d493578810db9e514fd13e11feb6392f6ed3
+Your p2p public key (base58):  5otEbT3q6tocrgNyGNTiuLKJmqwnAwRrQr3Ax7C2g42e
+Your p2p PeerID:               12D3KooWEdFQLadYHo57GZtPtyD4g8Q9GAzRCdWLNSQCL6LvZzka
+
+SPAMMER:
+Your p2p private key (hex):    1115194ecc7e8ee7515971f5c91d0e954962ae180792cccbddbd86bc42d845e715df170b762073ad3882fabca69f2ddfc1a766ffc244c5f1020eb2da25a3426b
+Your p2p public key (hex):     15df170b762073ad3882fabca69f2ddfc1a766ffc244c5f1020eb2da25a3426b
+Your p2p public key (base58):  2UNs692BDYrbQVfu4TQXvAjBVw11o2ZUVLXFTf3vMdmt
+Your p2p PeerID:               12D3KooWBHk2qGbtQT85pPBKh49sgxp1zG3epidxSvtGqeCpFaVp
