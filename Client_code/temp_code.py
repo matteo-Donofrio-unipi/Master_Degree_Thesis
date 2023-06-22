@@ -1,12 +1,9 @@
 import os 
 import hashlib
 import pandas as pd
+import binascii
+
+add = '22092053193ac10b96fd70c9d8378f6d690592067c81cfa2658a3e795fd22c9c'
 
 
-file = open("data_message.txt", "r")
-all_of_it = file.read()
-print(all_of_it) 
-# close the file
-file.close()
-
-    
+print(len(add))
