@@ -4,8 +4,10 @@ import os
 import hashlib
 
 
-# operation can be 'get_msg_by_author', 'get_msg_by_id', 'send_msg', 'get_balance', 'send_msg_with_parents'
-OPERATION = 'get_msg_by_author'
+# operation can be 'get_msg_by_author', 'get_msg_by_id', 'send_msg',
+# 'get_balance', 'send_msg_with_parents_by_author', 'send_msg_with_parents_by_id'
+#  'get_all_author_msgs'
+OPERATION = ''
 
 
 #get messages by index=> author seed
@@ -31,7 +33,7 @@ def getMsgById(client, id_Message):
     print("Message Metadata\n")
     message_meta = client.get_message_metadata(id_Message)
     print(message_meta)
-    
+
     message = client.get_message_data(id_Message)
     data = message['payload']['indexation']
     data = data[0] 
@@ -43,7 +45,35 @@ def getMsgById(client, id_Message):
     print(text)
 
 
-def sendMsgWithParents(client, seed, index_key_parent):
+
+def getAllAuthorMessages(client, index_key_author):
+
+    print(f"# All messages having the author index: {index_key_author}\n")
+
+    messages = client.find_messages(indexation_keys=[index_key_author])
+
+
+    for i in range (len(messages)):
+
+        message = messages[i]
+        #print(f'Messages: {message}')
+
+        msg_id = message['message_id']
+        data = message['payload']['indexation']
+        data = data[0] 
+        data = data['data']
+        #print(type(data))
+        text = str(bytearray(data).decode('utf-8'))  
+
+        print(f'MESSAGE ID: {msg_id} \n')
+        print(f'DATA: {text}')
+        print("\n\n")
+        print('---')
+
+
+
+
+def sendMsgWithParentsByAuthor(client, seed, index_key_parent):
 
     print('dentro la f')
 
@@ -64,9 +94,19 @@ def sendMsgWithParents(client, seed, index_key_parent):
 
 
 
+def sendMsgWithParentsById(client, seed, id_parent):
+
+    data_of_payload = getDataFromFile()
+    #print(type(data))
+    
+    message = client.message(index=seed, data_str=data_of_payload, parents = [str(id_parent)])
+    #print(message)
+
+
+
 
 def sendEmptyMsg(client, seed):
-    message = client.message(index=seed, data_str='ARTICOLO 1 DATA')
+    message = client.message(index=seed, data_str='ARTICOLO 4 DATA')
     print(message)
 
 
@@ -129,7 +169,7 @@ def writeLastAuotoincrementIndex(newIndex):
 def main():
     #INIT CONNECTION TO NODE AND SEED/ADDRESS RETRIEVING
 
-    print("\n##########\n")
+    print("\n##########")
 
     # create a client with a node
     client = iota_client.Client(
@@ -147,8 +187,9 @@ def main():
         seed = data[1]
         file.close()
 
-        print(f'seed: {seed}')
-        print(f'address: {address}')
+        print(f'My seed: {seed}\n##########')
+
+        #print(f'address: {address}')
         
 
     except:
@@ -172,23 +213,32 @@ def main():
         file.close()    
 
 
-    idMsg_to_retrieve = '7d89a17e2a732717c7fd3642c2624a1da64066eef050b056305788ceeca5b203'
-    index_author_to_retrieve = 'ad179eb32b067a4eb5d7799a013c245d407ceb2c77600a963c768e6260a01898'
+    idMsg = '5988512f98e7d05d6f64532067566e04d7eb2e355e8048c186b3fd71a2a77bd1'
+    index_author = 'ad179eb32b067a4eb5d7799a013c245d407ceb2c77600a963c768e6260a01898'
 
     if(OPERATION=='get_msg_by_id'):
-        getMsgById(client, idMsg_to_retrieve)
+        getMsgById(client, idMsg)
 
     elif(OPERATION=='get_msg_by_author'):
-        getMsgByAuthor(client, index_author_to_retrieve)
+        getMsgByAuthor(client, index_author)
     
     elif(OPERATION=='send_msg'):
         sendEmptyMsg(client, seed)
 
     elif(OPERATION=='send_msg_with_parents'):
-        sendMsgWithParents(client, seed, index_author_to_retrieve)
+        sendMsgWithParentsByAuthor(client, seed, index_author)
 
     elif(OPERATION=='get_balance'):
         getBalance(client, address)
+    
+    elif(OPERATION=='get_all_author_msgs'):
+        getAllAuthorMessages(client, index_author)
+
+    elif(OPERATION == 'send_msg_with_parents_by_id'):
+        sendMsgWithParentsById(client, seed, idMsg)
+    
+    else:
+        print(client.get_treasury())
                     
 
     print("\n##########\n")
