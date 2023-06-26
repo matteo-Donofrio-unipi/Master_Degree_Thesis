@@ -176,7 +176,7 @@ def main():
 
     # create a client with a node
     client = iota_client.Client(
-        nodes_name_password=[['http://0.0.0.0:14265']])
+        nodes_name_password=[['http://0.0.0.0:14266']])
 
     #print(client.get_info())
 

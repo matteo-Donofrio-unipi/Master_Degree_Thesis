@@ -5,10 +5,11 @@ import iota_client
 import hashlib
 import json
 import csv
- 
+
 INDEXAUTHORSLIST = []
 
 def MQTT_callback(msg):
+    global INDEXAUTHORSLIST
     #the msg received is a structured string, it will be converted as dict and 
     #its field will be read 
 
@@ -32,6 +33,35 @@ def MQTT_callback(msg):
         INDEXAUTHORSLIST.append(author_index)
         writeNewIndexAuthor(author_index)
 
+
+def getAllMessages(client):
+    global INDEXAUTHORSLIST
+
+    print('\nMessages on Tangle\n')
+
+    for i in range (len(INDEXAUTHORSLIST)):
+        author_index = INDEXAUTHORSLIST[i]
+        print(f'author_index: {author_index}')
+
+        messages = client.find_messages(indexation_keys=[author_index])
+
+        for j in range(len(messages)):
+            message = messages[j]
+
+            message_id = message['message_id']
+
+            parents = message['parents']
+
+            data = message['payload']['indexation']
+            data = data[0] 
+            data = data['data']
+            data = str(bytearray(data).decode('utf-8')) 
+
+            print(f'msg_id: {message_id}')
+            print(f'parents: {parents}')
+            print(f'data: {data}')
+            print('---\n')
+        print('#######')
 
 #write a new Index Author to the DB file
 def writeNewIndexAuthor(author_index):
@@ -74,8 +104,8 @@ def main():
         nodes_name_password=[['http://0.0.0.0:14265']])
 
 
+    global INDEXAUTHORSLIST
     INDEXAUTHORSLIST = readIndexAuthorsList()
-
     #subscribe to MQTT topic    
     client.subscribe_topic('messages',MQTT_callback)
     print('MQTT Subscription')
@@ -84,6 +114,9 @@ def main():
 
     while(user_command!='exit'):
         user_command = input("Please enter a command:\n")
+
+        if(user_command == 'get_all_messages'):
+            getAllMessages(client)
 
 
 
