@@ -4,13 +4,12 @@ import os
 import hashlib
 
 
-# operation can be 'get_msg_by_author', 'get_msg_by_id', 'send_msg',
+# user_command can be 'get_msg_by_author', 'get_msg_by_id', 'send_msg',
 # 'get_balance', 'send_msg_with_parents_by_author', 'send_msg_with_parents_by_id'
 #  'get_all_author_msgs'
-OPERATION = ''
 
 
-#get messages by index=> author seed
+#get messages by author index (author seed)
 def getMsgByAuthor(client, index_key_author):
 
     print("Message data\n")
@@ -45,7 +44,7 @@ def getMsgById(client, id_Message):
     print(text)
 
 
-
+#retrieve all the messages having the specified index author
 def getAllAuthorMessages(client, index_key_author):
 
     print(f"# All messages having the author index: {index_key_author}\n")
@@ -55,9 +54,11 @@ def getAllAuthorMessages(client, index_key_author):
 
     for i in range (len(messages)):
 
+        #take each single message
         message = messages[i]
         #print(f'Messages: {message}')
 
+        #retrieve the id and the data contained in the payload
         msg_id = message['message_id']
         data = message['payload']['indexation']
         data = data[0] 
@@ -72,10 +73,10 @@ def getAllAuthorMessages(client, index_key_author):
 
 
 
-
+#send a msg specifiying, as single parent msg to reference, 
+# any msg published by a given author index  
 def sendMsgWithParentsByAuthor(client, seed, index_key_parent):
 
-    print('dentro la f')
 
     data_of_payload = getDataFromFile()
     #print(type(data))
@@ -93,7 +94,8 @@ def sendMsgWithParentsByAuthor(client, seed, index_key_parent):
     #print(message)
 
 
-
+#send a msg specifiying, as single parent msg to reference, 
+# the id of a msg  
 def sendMsgWithParentsById(client, seed, id_parent):
 
     data_of_payload = getDataFromFile()
@@ -104,7 +106,7 @@ def sendMsgWithParentsById(client, seed, id_parent):
 
 
 
-
+#send a msg without specify the parents (the node will select them for us)
 def sendEmptyMsg(client, seed):
     message = client.message(index=seed, data_str='ARTICOLO 4 DATA')
     print(message)
@@ -115,7 +117,6 @@ def sendEmptyMsg(client, seed):
 def getBalance(client, address):
     print(f'get_address_balance() for address {address}')
     print(f'balance: {client.get_address_balance(address)}')
-
 
 
 ### FUNCTIONS ACCESSING FILES ###
@@ -166,6 +167,8 @@ def writeLastAuotoincrementIndex(newIndex):
 
 
 
+
+
 def main():
     #INIT CONNECTION TO NODE AND SEED/ADDRESS RETRIEVING
 
@@ -180,7 +183,7 @@ def main():
     ###CHECK OR GENERATE ADDRESSES###
 
     try:
-        file = open("seed_address.txt", "r")
+        file = open("address_seed.txt", "r")
         data = file.readlines()
         #print(data)
         address = data[0]
@@ -207,41 +210,51 @@ def main():
         )
         print(address)
 
-        file = open("seed_address.txt", "x")
+        file = open("address_seed.txt", "x")
         file.write(address[0][0]+'\n')
         file.write(seed)        
         file.close()    
 
 
-    idMsg = '5988512f98e7d05d6f64532067566e04d7eb2e355e8048c186b3fd71a2a77bd1'
-    index_author = 'ad179eb32b067a4eb5d7799a013c245d407ceb2c77600a963c768e6260a01898'
+    command_list = 'get_msg_by_author, get_msg_by_id, get_all_author_msgs, send_msg, send_msg_with_parents_by_author, send_msg_with_parents_by_id\n'
+    print('Command List:\n')
+    print(command_list)
 
-    if(OPERATION=='get_msg_by_id'):
-        getMsgById(client, idMsg)
+    user_command = ''
 
-    elif(OPERATION=='get_msg_by_author'):
-        getMsgByAuthor(client, index_author)
-    
-    elif(OPERATION=='send_msg'):
-        sendEmptyMsg(client, seed)
+    while(user_command != 'exit'):
 
-    elif(OPERATION=='send_msg_with_parents'):
-        sendMsgWithParentsByAuthor(client, seed, index_author)
+        user_command = input("Please enter a command:\n")
 
-    elif(OPERATION=='get_balance'):
-        getBalance(client, address)
-    
-    elif(OPERATION=='get_all_author_msgs'):
-        getAllAuthorMessages(client, index_author)
 
-    elif(OPERATION == 'send_msg_with_parents_by_id'):
-        sendMsgWithParentsById(client, seed, idMsg)
-    
-    else:
-        print(client.get_treasury())
-                    
+        if(user_command=='get_msg_by_id'):
+            idMsg = input("Please enter a message id:\n")
+            getMsgById(client, idMsg)
 
-    print("\n##########\n")
+        elif(user_command=='get_msg_by_author'):
+            index_author = input("Please enter an author index:\n")
+            getMsgByAuthor(client, index_author)
+
+        elif(user_command=='get_balance'):
+            getBalance(client, address)
+        
+        elif(user_command=='get_all_author_msgs'):
+            index_author = input("Please enter an author index:\n")
+            getAllAuthorMessages(client, index_author)
+
+        elif(user_command == 'send_msg_with_parents_by_id'):
+            idMsg = input("Please enter a message id:\n")
+            sendMsgWithParentsById(client, seed, idMsg)
+        
+        elif(user_command=='send_msg'):
+            sendEmptyMsg(client, seed)
+
+        elif(user_command=='send_msg_with_parents_by_author'):
+            index_author = input("Please enter an author index:\n")
+            sendMsgWithParentsByAuthor(client, seed, index_author)
+                        
+
+        print("\n##########\n")
 
 
 
