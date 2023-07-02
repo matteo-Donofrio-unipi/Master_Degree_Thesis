@@ -154,6 +154,8 @@ def loadArxivDataset(client):
         caricati.loc[i,'NodeId'] = TOPOLOGICAL_SORT_df.iloc[i]['0']
         caricati.loc[i,'msgIdTangle'] = str(message['message_id'])
 
+        if(i%100 == 0):
+            print(i)
 
 
 def getBalance(client, address):
