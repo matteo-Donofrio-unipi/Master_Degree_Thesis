@@ -7,7 +7,10 @@ import json
 import csv
 import numpy as np
 import networkx as nx
+import queue
+global AUTHORSDB
 
+global Queue
 
 #load the index authors list from DB file to a Global variable
 def readIndexAuthorsList():
@@ -27,7 +30,12 @@ def readIndexAuthorsList():
 
 
 
+
+
 def MQTT_callback(msg):
+    global Queue
+
+
     #the msg received is a structured string, it will be converted as dict and 
     #its field will be read 
 
@@ -52,8 +60,8 @@ def MQTT_callback(msg):
     print(f'MsgId: {message_id}\n')
     print(f'Index author: {author_seed}')
     print(f'Data: {data}\n')
-    print(f'Parents: {parents_id}\n')
-    
+    #print(f'Parents: {parents_id}\n')
+
     #here, given the published msg we've: msg_id, auth_seed, parents_id
 
     #for each citation done by the published msg, we add a row in the DB
@@ -66,11 +74,66 @@ def MQTT_callback(msg):
     #verify if the author index is new or already in DB
     #if new => add to DB
     
-    if(author_seed not in authors_seed_db):
-        authors_seed_db.append(author_seed)
+    if(author_seed not in AUTHORSDB):
+        AUTHORSDB.append(author_seed)
         writeNewSeedAuthor(author_seed)
+    
+    item = Queue.get()
 
     print("\nPlease enter a command:\n")
+
+
+def loadArxivDataset(client):
+    global Queue
+
+    paperId_and_info_and_date_Seed = pd.read_csv('./Data_to_load/paperId_and_info_and_date_Seed.csv')
+
+    citations_with_data= pd.read_csv('./Data_to_load/citations(hep-th)_with_Data.csv')
+
+    TOPOLOGICAL_SORT_df= pd.read_csv('./Data_to_load/TOPOLOGICAL_SORT_df.csv')
+
+    #df temporale per associare i NodeId dati dal dataset ai msgId dati dalla tangle
+    #utile per tracciare articoli caricati e fare referenze a parents (citazioni)
+    caricati = pd.DataFrame(columns=['NodeId','msgIdTangle']) 
+
+    for i in range(len(TOPOLOGICAL_SORT_df)-1,0,-1):
+
+        while(Queue.qsize()>0):
+            pass
+
+        #info sull'articolo da caricare
+        article_id = TOPOLOGICAL_SORT_df.iloc[i]['0']
+        author_seed = paperId_and_info_and_date_Seed[paperId_and_info_and_date_Seed['ToNodeId']==article_id]['Seed']
+        title = paperId_and_info_and_date_Seed[paperId_and_info_and_date_Seed['ToNodeId']==article_id]['Title']
+        date = paperId_and_info_and_date_Seed[paperId_and_info_and_date_Seed['ToNodeId']==article_id]['Date']
+    
+        #controllo le citazioni uscenti dall'articolo da caricare
+        outgoing_citations = citations_with_data[citations_with_data['FromNodeId']==article_id]
+    
+    
+        if(len(outgoing_citations)==0): #dal nodo in considerazione non escono citazioni  
+
+            message = client.message(index=author_seed.values[0], data_str=str(title.values[0]+'\n Date: '+date.values[0]))
+            #print(caricati.loc[i])
+        
+        else:
+            #se ci sono parents, li ottengo prendendo il sottoinsieme di articoli già
+            #caricati il cui NodeId è uguale ai NodeId degli articoli che sto citando
+            parents = caricati[caricati['NodeId'].isin(outgoing_citations['ToNodeId'].values)]['msgIdTangle']
+            parents = list(parents.values)
+
+            if(len(parents)>= 9):
+                parents = parents[0:8]
+
+            message = client.message(index=author_seed.values[0], data_str=str(title.values[0]+'\n Date: '+date.values[0]), parents = parents)
+
+        caricati.loc[i,'NodeId'] = TOPOLOGICAL_SORT_df.iloc[i]['0']
+        caricati.loc[i,'msgIdTangle'] = str(message['message_id'])
+
+        Queue.put('wait')
+
+        if(i%100 == 0):
+            print(i)
 
 
 def addRowToDB(FromNodeId, From_Author_Seed, ToNodeId):
@@ -100,6 +163,9 @@ def addRowToDB(FromNodeId, From_Author_Seed, ToNodeId):
     if(len(query)>0):
         To_Author_Seed = np.unique(query.values)[0]
     else:
+        #Not available ogni volta che il messaggio usato come parent è 
+        #un messaggio non caricato da un utente della piattaforma 
+        # (o di cui nel dataset non citano nessuno )
         To_Author_Seed = 'Not_available'
 
     #add the auth seed to the row
@@ -120,18 +186,23 @@ def computePageRank():
             print('No messages available to PR computation')
             return
         else:
-            print('Messages found, starting PR computation...\n') 
+            print(f'#{len(DB_articles_authors)} Messages found, starting PR computation...\n') 
 
     DB_starting = DB_articles_authors #make a copy (snapshot)
 
     #estraggo tutti i seed introdotti nella piattaforma
     From_seed_ids = DB_articles_authors.From_Author_Seed.values
 
+
+    #NB: prendo solo i seed degli autori in From, perche per costruire il grafo
+    # aggiungo archi (e non nodi). Quindi aggiungere tutti gli archi =>
+    # aggiungere tutti i nodi contenuti nel grafo
+
     
     #rimuovo i duplicati e lascio solo seed distinti
     unique_seed_ids = np.unique(From_seed_ids)
 
-    print(f'UNIQUE SEEDS: {unique_seed_ids}')
+    print(f'#UNIQUE SEEDS: {len(unique_seed_ids)}')
 
     #creo grafo vuoto
     D=nx.DiGraph() 
@@ -166,13 +237,13 @@ def computePageRank():
     #ottengo matrice adiacenza da grafo
     AM_sparse =nx.adjacency_matrix(D) #list storage type
     AM_matrix = AM_sparse.todense()
-    print(AM_matrix)
+    print(f'Adjacency Matrix on authors citation: {AM_matrix}')
     np.savetxt(r'./AM_Matrix.txt', AM_matrix, fmt='%d')
 
     #calcolo PageRank
     PR = nx.pagerank(D)
     PR_df = pd.DataFrame.from_dict(PR,orient='index') 
-    print(PR_df)
+    print(f'Page Rank Values: {PR_df}')
     PR_df.to_csv('./PR_df.csv',index=False)   
 
 
@@ -181,11 +252,15 @@ def computePageRank():
 #by reading the INDEXAUTHORSLIST stored and get all msg from authors  
 def buildDBArticlesAuthors():
 
+    global AUTHORSDB
+
     print('\nMessages on Tangle\n')
 
-    for i in range (len(authors_seed_db)):
-        author_seed = authors_seed_db[i]
-        print(f'author_index: {author_seed}')
+    print(f'LEN AUTHORS (buildDBArticlesAuthors): {len(AUTHORSDB)}')
+
+    for i in range (len(AUTHORSDB)):
+        author_seed = AUTHORSDB[i]
+        #print(f'author_index: {author_seed}')
 
         #msgs from a given author
         messages = client.find_messages(indexation_keys=[author_seed])
@@ -202,17 +277,18 @@ def buildDBArticlesAuthors():
             data = data['data']
             data = str(bytearray(data).decode('utf-8')) 
 
-            print(f'msg_id: {message_id}')
-            print(f'parents: {parents}')
-            print(f'data: {data}')
-            print('---\n')
+            #print(f'msg_id: {message_id}')
+            #print(f'parents: {parents}')
+            #print(f'data: {data}')
+            #print('---\n')
 
             #for each citation done by the published msg, we add a row in the DB
         for parent_id in parents:
             #the parent msg's author_seed will be retrieved, since if a msg is cited => its author is already in the DB 
             addRowToDB(message_id, author_seed, parent_id)
+        #print('#######')
 
-        print('#######')
+    DB_articles_authors.to_csv('./DB_articles_authors2.csv',index = False)
 
 #write a new Index Author to the DB file
 def writeNewSeedAuthor(author_index):
@@ -232,7 +308,7 @@ def readIndexAuthorsList():
         for i in range(len(index_authors_list)):
             index_authors_list[i] = index_authors_list[i].replace("\n", "")
 
-        print(index_authors_list)
+        print(f'Found #{len(index_authors_list)} authors from the file lista_seed_autori.txt \n')
     except:
         
         index_authors_list = []
@@ -250,16 +326,18 @@ client = iota_client.Client(
 #on init create the DB that stores articles and track citations
 DB_articles_authors = pd.DataFrame(columns=['FromNodeId', 'From_Author_Seed','ToNodeId', 'To_Author_Seed']) #definisco df
 
-authors_seed_db = []
-
 
 def main():
     #INIT CONNECTION TO NODE AND SEED/ADDRESS RETRIEVING
+    global Queue
+
+    Queue = queue.Queue(maxsize=1)
 
     print("\n##########")
 
 
-    authors_seed_db = readIndexAuthorsList()
+    global AUTHORSDB
+    AUTHORSDB = readIndexAuthorsList()
     #subscribe to MQTT topic    
     client.subscribe_topic('messages',MQTT_callback)
     print('MQTT Subscription')
@@ -270,11 +348,15 @@ def main():
         user_command = input("\nPlease enter a command:\n")
         
         if(user_command == 'print_DB'):
+            print(f'Len DB_articles_authors: {len(DB_articles_authors)}')
             for i in range(len(DB_articles_authors)):
                 print(DB_articles_authors.iloc[i]+'\n')
 
         if(user_command == 'PR'):
             computePageRank()
+
+        if(user_command == 'LAD'):
+            loadArxivDataset(client)
         
 
 
