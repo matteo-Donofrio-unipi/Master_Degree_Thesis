@@ -73,6 +73,8 @@ def getAllAuthorMessages(client, index_key_author):
 
 
 
+
+
 #send a msg specifiying, as single parent msg to reference, 
 # any msg published by a given author index  
 def sendMsgWithParentsByAuthor(client, seed, index_key_parent):
@@ -114,48 +116,6 @@ def sendEmptyMsg(client, seed):
     id = message['message_id']
     print(id)
 
-
-def loadArxivDataset(client):
-    paperId_and_info_and_date_Seed = pd.read_csv('paperId_and_info_and_date_Seed.csv')
-
-    citations_with_data= pd.read_csv('citations(hep-th)_with_Data.csv')
-
-    TOPOLOGICAL_SORT_df= pd.read_csv('TOPOLOGICAL_SORT_df.csv')
-
-    caricati = pd.DataFrame(columns=['NodeId','msgIdTangle']) 
-
-    for i in range(len(TOPOLOGICAL_SORT_df)-1,0,-1):
-
-        #info sull'articolo da caricare
-        article_id = TOPOLOGICAL_SORT_df.iloc[i]['0']
-        author_seed = paperId_and_info_and_date_Seed[paperId_and_info_and_date_Seed['ToNodeId']==article_id]['Seed']
-        title = paperId_and_info_and_date_Seed[paperId_and_info_and_date_Seed['ToNodeId']==article_id]['Title']
-        date = paperId_and_info_and_date_Seed[paperId_and_info_and_date_Seed['ToNodeId']==article_id]['Date']
-    
-        #controllo le citazioni uscenti dall'articolo da caricare
-        sub_df = citations_with_data[citations_with_data['FromNodeId']==TOPOLOGICAL_SORT_df.iloc[i]['0']]
-    
-    
-    
-        if(len(sub_df)==0): #dal nodo in considerazione non escono citazioni  
-
-            message = client.message(index=author_seed.values[0], data_str=str(title.values[0]+'\n Date: '+date.values[0]))
-            #print(caricati.loc[i])
-        
-        else:
-            parents = caricati[caricati['NodeId'].isin(sub_df['ToNodeId'].values)]['msgIdTangle']
-            parents = list(parents.values)
-
-            if(len(parents)>= 9):
-                parents = parents[0:8]
-
-            message = client.message(index=author_seed.values[0], data_str=str(title.values[0]+'\n Date: '+date.values[0]), parents = parents)
-
-        caricati.loc[i,'NodeId'] = TOPOLOGICAL_SORT_df.iloc[i]['0']
-        caricati.loc[i,'msgIdTangle'] = str(message['message_id'])
-
-        if(i%100 == 0):
-            print(i)
 
 
 def getBalance(client, address):
@@ -296,7 +256,7 @@ def main():
             index_author = input("Please enter an author index:\n")
             sendMsgWithParentsByAuthor(client, seed, index_author)
                         
-        elif(user_command == 'load_arxiv_dataset'):
+        elif(user_command == 'LAD'):
             loadArxivDataset(client)
 
         print("\n##########\n")

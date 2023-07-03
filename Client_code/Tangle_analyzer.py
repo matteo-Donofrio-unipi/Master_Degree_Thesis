@@ -12,6 +12,16 @@ global AUTHORSDB
 
 global Queue
 
+# create a client with a node
+client = iota_client.Client(
+        nodes_name_password=[['http://0.0.0.0:14265']])
+
+#on init create the DB that stores articles and track citations
+global DB_articles_authors
+
+DB_articles_authors = pd.DataFrame(columns=['FromNodeId', 'From_Author_Seed','ToNodeId', 'To_Author_Seed']) #definisco df
+
+
 #load the index authors list from DB file to a Global variable
 def readIndexAuthorsList():
     try: 
@@ -127,7 +137,7 @@ def loadArxivDataset(client):
 
             message = client.message(index=author_seed.values[0], data_str=str(title.values[0]+'\n Date: '+date.values[0]), parents = parents)
 
-        caricati.loc[i,'NodeId'] = TOPOLOGICAL_SORT_df.iloc[i]['0']
+        caricati.loc[i,'NodeId'] = article_id
         caricati.loc[i,'msgIdTangle'] = str(message['message_id'])
 
         Queue.put('wait')
@@ -137,6 +147,7 @@ def loadArxivDataset(client):
 
 
 def addRowToDB(FromNodeId, From_Author_Seed, ToNodeId):
+    global DB_articles_authors
     #HERE THE 'ToNodeId' VALUE IS THE ID OF THE PARENT MESSAGE CITED BY THE NEW PUB MSG
 
 
@@ -207,6 +218,9 @@ def computePageRank():
     #creo grafo vuoto
     D=nx.DiGraph() 
 
+
+    
+
     #per ogni autore citante
     for citing_seed_author in unique_seed_ids:  
         
@@ -234,9 +248,14 @@ def computePageRank():
                 num_citations = outgoing_citation_from_seed[1][i] #[1] le occorrenze di tali valori
                 D.add_weighted_edges_from([(str(citing_seed_author),str(cited_seed_author),num_citations)])
 
+    nx.write_weighted_edgelist(D, 'graph.csv')
+
+
+
     #ottengo matrice adiacenza da grafo
     AM_sparse =nx.adjacency_matrix(D) #list storage type
     AM_matrix = AM_sparse.todense()
+    print(f'ADJM len: {len(AM_matrix)}')
     print(f'Adjacency Matrix on authors citation: {AM_matrix}')
     np.savetxt(r'./AM_Matrix.txt', AM_matrix, fmt='%d')
 
@@ -254,9 +273,17 @@ def buildDBArticlesAuthors():
 
     global AUTHORSDB
 
+    global DB_articles_authors
+
     print('\nMessages on Tangle\n')
 
     print(f'LEN AUTHORS (buildDBArticlesAuthors): {len(AUTHORSDB)}')
+
+    counter = 0
+
+    counter_Parents = 0
+
+    counter_Fun_calls = 0
 
     for i in range (len(AUTHORSDB)):
         author_seed = AUTHORSDB[i]
@@ -265,12 +292,16 @@ def buildDBArticlesAuthors():
         #msgs from a given author
         messages = client.find_messages(indexation_keys=[author_seed])
 
+        counter += len(messages)
+
         for j in range(len(messages)):
             message = messages[j]
 
             message_id = message['message_id']
 
             parents = message['parents']
+
+            counter_Parents += len(parents)
 
             data = message['payload']['indexation']
             data = data[0] 
@@ -283,11 +314,17 @@ def buildDBArticlesAuthors():
             #print('---\n')
 
             #for each citation done by the published msg, we add a row in the DB
-        for parent_id in parents:
-            #the parent msg's author_seed will be retrieved, since if a msg is cited => its author is already in the DB 
-            addRowToDB(message_id, author_seed, parent_id)
-        #print('#######')
+            for parent_id in parents:
 
+                counter_Fun_calls+=1
+                #the parent msg's author_seed will be retrieved, since if a msg is cited => its author is already in the DB 
+                addRowToDB(message_id, author_seed, parent_id)
+            #print('#######')
+
+    print(f'BAADB: COUNTER MESSAGES= {counter}')
+    print(f'BAADB: COUNTER PARENTS= {counter_Parents}')
+    print(f'BAADB: COUNTER FUN CALLS= {counter_Fun_calls}')
+    print(f'BAADB: len(AADB)= {len(DB_articles_authors)}')
     DB_articles_authors.to_csv('./DB_articles_authors2.csv',index = False)
 
 #write a new Index Author to the DB file
@@ -319,22 +356,17 @@ def readIndexAuthorsList():
 
 
 
-# create a client with a node
-client = iota_client.Client(
-        nodes_name_password=[['http://0.0.0.0:14265']])
-
-#on init create the DB that stores articles and track citations
-DB_articles_authors = pd.DataFrame(columns=['FromNodeId', 'From_Author_Seed','ToNodeId', 'To_Author_Seed']) #definisco df
 
 
 def main():
     #INIT CONNECTION TO NODE AND SEED/ADDRESS RETRIEVING
-    global Queue
+    
 
     Queue = queue.Queue(maxsize=1)
 
     print("\n##########")
 
+    global DB_articles_authors
 
     global AUTHORSDB
     AUTHORSDB = readIndexAuthorsList()
@@ -349,8 +381,6 @@ def main():
         
         if(user_command == 'print_DB'):
             print(f'Len DB_articles_authors: {len(DB_articles_authors)}')
-            for i in range(len(DB_articles_authors)):
-                print(DB_articles_authors.iloc[i]+'\n')
 
         if(user_command == 'PR'):
             computePageRank()
