@@ -11,6 +11,11 @@ import queue
 global AUTHORSDB
 
 global Queue
+Queue = queue.Queue(maxsize=1)
+
+global COUNTERPARENTS
+
+COUNTERPARENTS = 0
 
 # create a client with a node
 client = iota_client.Client(
@@ -20,6 +25,7 @@ client = iota_client.Client(
 global DB_articles_authors
 
 DB_articles_authors = pd.DataFrame(columns=['FromNodeId', 'From_Author_Seed','ToNodeId', 'To_Author_Seed']) #definisco df
+
 
 
 #load the index authors list from DB file to a Global variable
@@ -45,6 +51,7 @@ def readIndexAuthorsList():
 def MQTT_callback(msg):
     global Queue
 
+    global COUNTERPARENTS
 
     #the msg received is a structured string, it will be converted as dict and 
     #its field will be read 
@@ -64,6 +71,11 @@ def MQTT_callback(msg):
     dict = dict['payload']
     
     author_seed = str(bytearray(dict['data']['index']).decode('utf-8'))
+
+    #skip if the genesis msg is evaluated
+    if(author_seed == 'GENESIS-ALLEN'):
+        return
+
     data = str(bytearray(dict['data']['data']).decode('utf-8'))
 
     print('####### \n MQTT msg pub:')
@@ -75,6 +87,9 @@ def MQTT_callback(msg):
     #here, given the published msg we've: msg_id, auth_seed, parents_id
 
     #for each citation done by the published msg, we add a row in the DB
+
+    COUNTERPARENTS += len(parents_id)
+
     for parent_id in parents_id:
         #the parent msg's author_seed will be retrieved, since if a msg is cited => its author is already in the DB 
         addRowToDB(message_id, author_seed, parent_id)
@@ -96,6 +111,14 @@ def MQTT_callback(msg):
 def loadArxivDataset(client):
     global Queue
 
+    counter_cit_caricate = 0
+
+    counter_cit_teoriche = 0
+
+    counter_frontiera = 0
+
+    counter_cit_tolte =0
+
     paperId_and_info_and_date_Seed = pd.read_csv('./Data_to_load/paperId_and_info_and_date_Seed.csv')
 
     citations_with_data= pd.read_csv('./Data_to_load/citations(hep-th)_with_Data.csv')
@@ -106,7 +129,13 @@ def loadArxivDataset(client):
     #utile per tracciare articoli caricati e fare referenze a parents (citazioni)
     caricati = pd.DataFrame(columns=['NodeId','msgIdTangle']) 
 
-    for i in range(len(TOPOLOGICAL_SORT_df)-1,0,-1):
+
+    #carico messaggio iniziale a cui i nodi di frontiera faranno riferimento
+    genesis_msg = client.message(index = 'GENESIS-ALLEN',data_str='GENESIS ARTICLE')
+    genesis_msg_id = genesis_msg['message_id']
+    
+
+    for i in range(len(TOPOLOGICAL_SORT_df)-1,-1,-1):
 
         while(Queue.qsize()>0):
             pass
@@ -123,7 +152,9 @@ def loadArxivDataset(client):
     
         if(len(outgoing_citations)==0): #dal nodo in considerazione non escono citazioni  
 
-            message = client.message(index=author_seed.values[0], data_str=str(title.values[0]+'\n Date: '+date.values[0]))
+            counter_frontiera += 1 #mi aspetto vada a 67
+            message = client.message(index=author_seed.values[0], data_str=str(title.values[0]+'\n Date: '+date.values[0]), parents = [str(genesis_msg_id)])
+            #parents = parents
             #print(caricati.loc[i])
         
         else:
@@ -132,9 +163,15 @@ def loadArxivDataset(client):
             parents = caricati[caricati['NodeId'].isin(outgoing_citations['ToNodeId'].values)]['msgIdTangle']
             parents = list(parents.values)
 
+            counter_cit_teoriche += len(parents)
+
+
             if(len(parents)>= 9):
+                counter_cit_tolte += len(parents)-8
                 parents = parents[0:8]
 
+            counter_cit_caricate += len(parents)
+            
             message = client.message(index=author_seed.values[0], data_str=str(title.values[0]+'\n Date: '+date.values[0]), parents = parents)
 
         caricati.loc[i,'NodeId'] = article_id
@@ -142,9 +179,16 @@ def loadArxivDataset(client):
 
         Queue.put('wait')
 
-        if(i%100 == 0):
-            print(i)
+    print(f'COUNTER FRONTIERA: {counter_frontiera}')
+    print(f'COUNTER CIT TEORICHE: {counter_cit_teoriche}')
+    print(f'COUNTER CIT CARICATE: {counter_cit_caricate}')
+    print(f'I: {i}')
+    print(f'COUNTER CIT TOLTE: {counter_cit_tolte}')
+    
 
+    global COUNTERPARENTS
+
+    print(f'GLOBAL COUNTERPARENTS: {COUNTERPARENTS}')
 
 def addRowToDB(FromNodeId, From_Author_Seed, ToNodeId):
     global DB_articles_authors
@@ -162,7 +206,6 @@ def addRowToDB(FromNodeId, From_Author_Seed, ToNodeId):
     DB_articles_authors.loc[index_to_add_row,'From_Author_Seed'] = From_Author_Seed
     DB_articles_authors.loc[index_to_add_row,'ToNodeId'] = ToNodeId
 
-    
 
     #retrieve the parent_seed cited by the new msg:
 
@@ -198,6 +241,9 @@ def computePageRank():
             return
         else:
             print(f'#{len(DB_articles_authors)} Messages found, starting PR computation...\n') 
+
+    refresh_DBArticlesAuthors()
+    print('Executed REFRESH')
 
     DB_starting = DB_articles_authors #make a copy (snapshot)
 
@@ -263,9 +309,24 @@ def computePageRank():
     PR = nx.pagerank(D)
     PR_df = pd.DataFrame.from_dict(PR,orient='index') 
     print(f'Page Rank Values: {PR_df}')
-    PR_df.to_csv('./PR_df.csv',index=False)   
+    PR_df.to_csv('./PR_df.csv')   
 
 
+def refresh_DBArticlesAuthors():
+
+    global DB_articles_authors
+
+    for i in range(len(DB_articles_authors)):
+        if(DB_articles_authors.iloc[i]['To_Author_Seed']=='Not_available'):
+            ToNodeId = DB_articles_authors.iloc[i]['ToNodeId']
+
+            if(ToNodeId in DB_articles_authors['FromNodeId'].values):
+                q = DB_articles_authors[DB_articles_authors['FromNodeId']== ToNodeId]['From_Author_Seed']
+                To_Author_Seed = np.unique(q.values)[0]
+                print(To_Author_Seed)
+                DB_articles_authors.iloc[i]['To_Author_Seed'] = str(To_Author_Seed)
+    
+    DB_articles_authors.to_csv('./DB_articles_authors2.csv',index = False)
 
 #if client has restarted, the DB_articles_authors is empty, we can reconstruct it
 #by reading the INDEXAUTHORSLIST stored and get all msg from authors  
@@ -362,7 +423,7 @@ def main():
     #INIT CONNECTION TO NODE AND SEED/ADDRESS RETRIEVING
     
 
-    Queue = queue.Queue(maxsize=1)
+    
 
     print("\n##########")
 
