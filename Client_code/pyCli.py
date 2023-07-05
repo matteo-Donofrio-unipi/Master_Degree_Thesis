@@ -24,16 +24,26 @@ def getMsgByAuthor(client, index_key_author):
     #print(type(data))
     text = str(bytearray(data).decode('utf-8'))  
 
+    parents = message['parents']
+    print(f'parents: {parents}')
+
     print(text)
     
 #get messaged by messageId => unique id of this specific message
 def getMsgById(client, id_Message):
 
-    print("Message Metadata\n")
-    message_meta = client.get_message_metadata(id_Message)
-    print(message_meta)
-
+    print('Message wholw\n')
     message = client.get_message_data(id_Message)
+    print(message)
+
+    parents = message['parents']
+
+    author_seed = message['payload']['indexation'][0]['index']
+
+    
+    author_seed = (bytes.fromhex(author_seed).decode('utf-8'))
+
+
     data = message['payload']['indexation']
     data = data[0] 
     data = data['data']
@@ -43,6 +53,13 @@ def getMsgById(client, id_Message):
     print("\nMessage Data\n")
     print(text)
 
+    print('Parents:\n')
+    for i in parents:
+        print(i)
+
+    print('Seed author:\n')
+    print(type(author_seed))
+    print(author_seed)
 
 #retrieve all the messages having the specified index author
 def getAllAuthorMessages(client, index_key_author):
