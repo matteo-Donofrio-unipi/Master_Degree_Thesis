@@ -237,10 +237,10 @@ def main():
     CDF.to_csv('Clusters_DF_Computed.csv',index = False)
 
     #TEMPO IMPIEGATO: 1471.252479662 SEC = 24,5 MIN
+    #TEMPO IMPIEGATO SENZA RIMOZIONE 1487 SEC = 25 MIN
     CDF = pd.read_csv('./Clusters_DF_Computed.csv')
     #DF.rename(columns={'Unnamed: 0':'From'}, inplace = True)
     #DF.set_index('From',inplace = True,drop=True)
-    CDF
 
     best_clusterization = CDF.iloc[CDF[CDF['1']==CDF['1'].max()].index[0]]['0']
     clusters_authors = best_clusterization.split("'\n '")
@@ -253,12 +253,14 @@ def main():
             size_of_cluster.append(len(i.split("-")))
         else:
             size_of_cluster.append(1)
-
+            
+    #str formatting for first and last communities
+    clusters_authors[0] = clusters_authors[0].replace("['", "")
+    clusters_authors[-1] = clusters_authors[-1].replace("']", "")
 
     Best_Clusters_DF = pd.DataFrame(columns=[['cluster_authors','cluster_size']])
     Best_Clusters_DF['cluster_authors'] = clusters_authors
     Best_Clusters_DF['cluster_size'] = size_of_cluster
-    Best_Clusters_DF  
 
 
 if __name__ == "__main__":
