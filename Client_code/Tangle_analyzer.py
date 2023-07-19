@@ -104,7 +104,7 @@ def loadArxivDataset(client):
 
 
     #carico messaggio iniziale a cui i nodi di frontiera faranno riferimento
-    genesis_msg = client.message(index = 'GENESIS-ALLEN',data_str='GENESIS ARTICLE')
+    genesis_msg = client.message(index ='GENESIS-ALLEN',data_str='GENESIS ARTICLE')
     genesis_msg_id = genesis_msg['message_id']
 
 
@@ -177,8 +177,9 @@ def addRowToDB(FromNodeId, From_Author_Seed, ToNodeId):
     if(len(query)>0):
         To_Author_Seed = np.unique(query.values)[0]
     else:
-        #Not available ogni volta che il messaggio usato come parent è 
-        #il GENESIS_MSG
+        #Not available ogni volta che il messaggio usato come parent è il GENESIS_MSG
+        #perche query = autore che ha pubblicato articolo e quindi è in FromNodeId,
+        #ma GENESIS MSG non è inserito come FromNodeId, quindi non viene trovato
         To_Author_Seed = 'Not_available'
 
     #add the auth seed to the row
@@ -204,6 +205,9 @@ def computePageRank():
     DB_starting = DB_articles_authors #make a copy (snapshot)
 
     #estraggo tutti i seed introdotti nella piattaforma
+    #saranno tutti in From perche:
+        #se citi genesis => sei in from, il to è genesis tx
+        #se citi articoli => sei in from, il to è l'articolo citato
     From_seed_ids = DB_articles_authors.From_Author_Seed.values
 
 
@@ -247,13 +251,14 @@ def computePageRank():
 
             #inserisco nel grafo l'arco (autore_citante, autore_citato, num citazioni)
             for i in range(len(outgoing_citation_from_seed[0])):
+
                 cited_seed_author = outgoing_citation_from_seed[0][i] #[0] contiene i diversi valori
                 
-                if(citing_seed_author=='ff9af28010b1a78e3af698c64734cecf907988b927435d9a887a4cdcce248611'):
-                    print(f'AUTORI CITATI: {cited_seed_author}')
-
                 num_citations = outgoing_citation_from_seed[1][i] #[1] le occorrenze di tali valori
-                D.add_weighted_edges_from([(str(citing_seed_author),str(cited_seed_author),num_citations)])
+                
+                #non considero le auto citazioni per il calcolo del page rank
+                if(citing_seed_author!=cited_seed_author):
+                    D.add_weighted_edges_from([(str(citing_seed_author),str(cited_seed_author),num_citations)])
 
     nx.write_weighted_edgelist(D, 'graph.csv')
 
@@ -262,6 +267,7 @@ def computePageRank():
     #ottengo matrice adiacenza da grafo
     #AM_sparse =nx.adjacency_matrix(D) #list storage type
     AM_matrix = nx.adjacency_matrix(D, nodelist=D.nodes()).todense()
+    
     AM_matrix_df = pd.DataFrame(AM_matrix)
     AM_matrix_df.set_index(unique_seed_ids,inplace = True)
     AM_matrix_df.columns = unique_seed_ids
@@ -275,7 +281,7 @@ def computePageRank():
     PR = nx.pagerank(D)
     PR_df = pd.DataFrame.from_dict(PR,orient='index') 
     print(f'Page Rank Values: {PR_df}')
-    PR_df.to_csv('./PR_df.csv')   
+    PR_df.to_csv('./PR_df_spam_attack.csv')   
 
 
 #if client has restarted, the DB_articles_authors is empty, we can reconstruct it

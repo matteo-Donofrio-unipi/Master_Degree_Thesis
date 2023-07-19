@@ -133,6 +133,33 @@ def sendEmptyMsg(client, seed):
     id = message['message_id']
     print(id)
 
+def send_first_article(client,seed):
+    
+    data_of_payload = getDataFromFile()
+    #print(type(data))
+    
+    message = client.message(index=seed, data_str=data_of_payload, parents = [str('537757c9c53bff3b1cd406e13e6b9695b6939e5bb56e24cee6ef588898326fee')])
+    #print(message)
+
+
+def send_spam(client):
+    
+    #generate new seed
+    new_seed = hashlib.sha256(os.urandom(256)).hexdigest()
+
+    print('PRIMA')
+    r = client.message(index=new_seed, data_str='SPAM-', parents = [str('584c595c674b1a819f2961507edd691402e844b564c66310c17f2cf0421a2fbd')])
+    print(r)
+    r = client.message(index=new_seed, data_str='SPAM-S', parents = [str('584c595c674b1a819f2961507edd691402e844b564c66310c17f2cf0421a2fbd')])
+    print(r)
+    r = client.message(index=new_seed, data_str='SPAM-SP', parents = [str('584c595c674b1a819f2961507edd691402e844b564c66310c17f2cf0421a2fbd')])
+    print(r)
+    r = client.message(index=new_seed, data_str='SPAM-SPA', parents = [str('584c595c674b1a819f2961507edd691402e844b564c66310c17f2cf0421a2fbd')])
+    print(r)
+    r = client.message(index=new_seed, data_str='SPAM-SPAM-SPAM', parents = [str('584c595c674b1a819f2961507edd691402e844b564c66310c17f2cf0421a2fbd')])
+    print(r)
+    print('DOPO')
+    #print(message)
 
 
 def getBalance(client, address):
@@ -273,8 +300,14 @@ def main():
             index_author = input("Please enter an author index:\n")
             sendMsgWithParentsByAuthor(client, seed, index_author)
                         
-        elif(user_command == 'LAD'):
-            loadArxivDataset(client)
+        #elif(user_command == 'LAD'):
+        #    loadArxivDataset(client)
+
+        elif(user_command == 'SS'): #send spam
+            send_spam(client)
+
+        elif(user_command == 'FS'): #first article to be spammed
+            send_first_article(client,seed)
 
         print("\n##########\n")
 
