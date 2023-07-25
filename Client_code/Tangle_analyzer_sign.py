@@ -16,24 +16,6 @@ from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives import serialization
 from cryptography.exceptions import InvalidSignature
 
-#list/DB of authors that uploaded articles on the platform
-global AUTHORSDB
-
-#list/DB of all the message ids uploaded in the platform 
-global MSGDB
-
-#on init create the DB that stores articles and citations
-global DB_articles_authors
-DB_articles_authors = pd.DataFrame(columns=['FromNodeId', 'From_Author_Seed','ToNodeId', 'To_Author_Seed'])
-
-#queue used to synch the messages loader and the MQTT messages receiver 
-global Queue
-Queue = queue.Queue(maxsize=1)
-
-# create a client with a node
-client = iota_client.Client(
-        nodes_name_password=[['http://0.0.0.0:14265']])
-
 
 def MQTT_callback(msg):
     #the msg received is a structured string, it will be converted as dict and 
@@ -41,6 +23,7 @@ def MQTT_callback(msg):
 
     global Queue
 
+    global MSGDB
     #print('MSG')
     #print(msg)
 
@@ -115,20 +98,14 @@ def MQTT_callback(msg):
     #print(f'Data: {data}\n')
     #print(f'Parents: {parents_id}\n')
 
-    #here, given the published msg we've: msg_id, auth_seed, [parents_id]
+    #here, given the published msg we've: msg_id, auth_pub_key, [parents_id]
     #for each citation done by the published msg, we add a row in the DB
 
     for parent_id in parents_id:
-        #the parent msg's author_seed will be retrieved, since if a msg is cited => its author is already in the DB 
+        #the parent msg's author_pub_key will be retrieved, since if a msg is cited => its author is already in the DB 
         addRowToDB(message_id, author_pub_key_string, parent_id)
     print('###\n')
 
-
-    #verify if the author index is new or already in DB
-    #if new => add to DB
-    #if(author_seed not in AUTHORSDB):
-    #    AUTHORSDB.append(author_seed)
-    #    writeNewSeedAuthor(author_seed)
 
     #add the new msg_id to the MSGDB
     MSGDB.append(message_id)
@@ -141,9 +118,11 @@ def MQTT_callback(msg):
 
 
 def loadArxivDataset(client):
-    global Queue
     #load the dataset used to upload messages
-    #paperId_and_info_and_date_Seed = pd.read_csv('./Data_to_load/paperId_and_info_and_date_Seed.csv')
+
+    global Queue
+
+    global DB_articles_authors
 
     paperId_and_info_and_date_and_keys = pd.read_csv('./Data_to_load/paperId_and_info_and_date_and_keys.csv')
 
@@ -175,6 +154,7 @@ def loadArxivDataset(client):
         #info sull'articolo da caricare
         article_id = TOPOLOGICAL_SORT_df.iloc[i]['0']
         
+        #pem = serializzazione della chiave, da oggetto di classe a stringa
         private_pem_string = paperId_and_info_and_date_and_keys[paperId_and_info_and_date_and_keys['NodeId']==article_id]['PrivateKey'].values[0]
         public_pem_string = paperId_and_info_and_date_and_keys[paperId_and_info_and_date_and_keys['NodeId']==article_id]['PublicKey'].values[0]
 
@@ -245,10 +225,11 @@ def loadArxivDataset(client):
         #print(f'END ITERATION')
 
     #salva il DB
-    DB_articles_authors.to_csv('./DB_articles_authors.csv',index = False)
+    DB_articles_authors.to_csv('./DB_articles_authors_after_load.csv',index = False)
 
 
-def addRowToDB(FromNodeId, From_Author_Seed, ToNodeId):
+def addRowToDB(FromNodeId, From_author_pub_key, ToNodeId):
+    #'FromNodeId', 'From_Author_Pub_Key','ToNodeId', 'To_Author_Pub_key'
     #HERE THE 'ToNodeId' VALUE IS THE ID OF THE PARENT MESSAGE CITED BY THE NEW PUB MSG
 
     global DB_articles_authors
@@ -259,33 +240,38 @@ def addRowToDB(FromNodeId, From_Author_Seed, ToNodeId):
     
     #add the given info
     DB_articles_authors.loc[index_to_add_row,'FromNodeId'] = FromNodeId #aggiungo valori
-    DB_articles_authors.loc[index_to_add_row,'From_Author_Seed'] = From_Author_Seed
+    DB_articles_authors.loc[index_to_add_row,'From_Author_Pub_Key'] = From_author_pub_key
     DB_articles_authors.loc[index_to_add_row,'ToNodeId'] = ToNodeId
 
 
-    #retrieve the parent msg author seed cited by the new msg:
+    #retrieve the parent msg Author_Pub_Key cited by the new msg:
 
-    #search in the DB, the message used as parent msg, then get its auth seed
-    query = DB_articles_authors[DB_articles_authors['FromNodeId'] == ToNodeId]['From_Author_Seed']
+    #search in the DB, the message used as parent msg, then get its Author_Pub_Key
+    query = DB_articles_authors[DB_articles_authors['FromNodeId'] == ToNodeId]['From_Author_Pub_Key']
     
     
     #query will contain a row for each citation done by this parent msg (ToNodeId)
     if(len(query)>0):
-        To_Author_Seed = np.unique(query.values)[0]
+        To_Author_Pub_key = np.unique(query.values)[0]
     else:
         #Not available ogni volta che il messaggio usato come parent è il GENESIS_MSG
         #perche query = autore che ha pubblicato articolo e quindi è in FromNodeId,
         #ma GENESIS MSG non è inserito come FromNodeId, quindi non viene trovato
-        To_Author_Seed = 'Not_available'
+        To_Author_Pub_key = 'Not_available'
 
-    #add the auth seed to the row
-    DB_articles_authors.loc[index_to_add_row,'To_Author_Seed'] = To_Author_Seed
+    #add the Author_Pub_Key to the row
+    DB_articles_authors.loc[index_to_add_row,'To_Author_Pub_key'] = To_Author_Pub_key
 
 
 #PR computed on the messages 
 def computePageRank():
+
+    print('Strating PageRank computation...\n')
+
+
+    global DB_articles_authors
     # DB_articles_authors ha le seguenti colonne:
-    # 'FromNodeId' | 'From_Author_Seed' | 'ToNodeId' | 'To_Author_Seed
+    #'FromNodeId', 'From_Author_Pub_Key','ToNodeId', 'To_Author_Pub_key'
 
     if(len(DB_articles_authors) == 0):
         print('No messages available to PR computation')
@@ -300,61 +286,62 @@ def computePageRank():
 
     DB_starting = DB_articles_authors #make a copy (snapshot)
 
-    #estraggo tutti i seed introdotti nella piattaforma
+    #estraggo tutti i pub_key introdotti nella piattaforma
     #saranno tutti in From perche:
         #se citi genesis => sei in from, il to è genesis tx
         #se citi articoli => sei in from, il to è l'articolo citato
-    From_seed_ids = DB_articles_authors.From_Author_Seed.values
+    From_pub_keys = DB_articles_authors.From_Author_Pub_Key.values
 
 
-    #NB: prendo solo i seed degli autori in From, perche per costruire il grafo
+    #NB: prendo solo le pub_keys degli autori in From, perche per costruire il grafo
     # aggiungo archi (e non nodi). Quindi aggiungere tutti gli archi =>
     # aggiungere tutti i nodi contenuti nel grafo
 
     
-    #rimuovo i duplicati e lascio solo seed distinti
-    unique_seed_ids = np.unique(From_seed_ids)
+    #rimuovo i duplicati e lascio solo pub_keys distinti
+    unique_pub_keys = np.unique(From_pub_keys)
 
-    print(f'#UNIQUE SEEDS: {len(unique_seed_ids)}')
+    print(f'#UNIQUE PUB KEYS: {len(unique_pub_keys)}')
 
     #creo grafo vuoto
     D=nx.DiGraph() 
 
-    for i in unique_seed_ids:
+    for i in unique_pub_keys:
         D.add_node(str(i),nodeId = str(i))
     
 
     #per ogni autore citante
-    for citing_seed_author in unique_seed_ids:  
+    for citing_pub_key_author in unique_pub_keys:  
         
         #raccolgo sue citazioni nel DB
-        outgoing_citation_from_seed = DB_starting[DB_starting['From_Author_Seed']==citing_seed_author]
+        outgoing_citation_from_pub_key = DB_starting[DB_starting['From_Author_Pub_Key']==citing_pub_key_author]
 
-        outgoing_citation_from_seed = outgoing_citation_from_seed[outgoing_citation_from_seed['To_Author_Seed']!= 'Not_available']
+        #non considero le citazioni fatte dalla frontiera verso la genesis tx
+        outgoing_citation_from_pub_key = outgoing_citation_from_pub_key[outgoing_citation_from_pub_key['To_Author_Pub_key']!= 'Not_available']
 
 
         #print('OCFS')
-        #print(outgoing_citation_from_seed)
+        #print(outgoing_citation_from_pub_key)
 
 
-        if(len(outgoing_citation_from_seed)>0):
+        if(len(outgoing_citation_from_pub_key)>0):
 
             #invidiuo il num di cit fatte verso ogni altro autore
-            outgoing_citation_from_seed = np.unique(outgoing_citation_from_seed.To_Author_Seed.values,return_counts=True)
+            outgoing_citation_from_pub_key = np.unique(outgoing_citation_from_pub_key.To_Author_Pub_key.values,return_counts=True)
 
             #print('OCFS2')
-            #print(outgoing_citation_from_seed)
+            #print(outgoing_citation_from_pub_key)
 
             #inserisco nel grafo l'arco (autore_citante, autore_citato, num citazioni)
-            for i in range(len(outgoing_citation_from_seed[0])):
+            for i in range(len(outgoing_citation_from_pub_key[0])):
 
-                cited_seed_author = outgoing_citation_from_seed[0][i] #[0] contiene i diversi valori
+                cited_pub_key_author = outgoing_citation_from_pub_key[0][i] #[0] contiene i diversi valori
                 
-                num_citations = outgoing_citation_from_seed[1][i] #[1] le occorrenze di tali valori
+                num_citations = outgoing_citation_from_pub_key[1][i] #[1] le occorrenze di tali valori
                 
                 #non considero le auto citazioni per il calcolo del page rank
-                if(citing_seed_author!=cited_seed_author):
-                    D.add_weighted_edges_from([(str(citing_seed_author),str(cited_seed_author),num_citations)])
+                if(citing_pub_key_author!=cited_pub_key_author):
+                    D.add_weighted_edges_from([(str(citing_pub_key_author),str(cited_pub_key_author),num_citations)])
 
     nx.write_weighted_edgelist(D, 'graph.csv')
 
@@ -365,8 +352,8 @@ def computePageRank():
     AM_matrix = nx.adjacency_matrix(D, nodelist=D.nodes()).todense()
 
     AM_matrix_df = pd.DataFrame(AM_matrix)
-    AM_matrix_df.set_index(unique_seed_ids,inplace = True)
-    AM_matrix_df.columns = unique_seed_ids
+    AM_matrix_df.set_index(unique_pub_keys,inplace = True)
+    AM_matrix_df.columns = unique_pub_keys
 
     print(f'ADJM len: {len(AM_matrix)}')
     #print(f'Adjacency Matrix on authors citation: {AM_matrix_df}')
@@ -377,20 +364,20 @@ def computePageRank():
     PR = nx.pagerank(D)
     PR_df = pd.DataFrame.from_dict(PR,orient='index') 
     print(f'Page Rank Values: {PR_df}')
-    PR_df.to_csv('./PR_df_spam_attack_2.csv')   
+    PR_df.to_csv('./PR_df.csv')  
+
+    print('PR computed') 
 
 
 #if client has restarted, the DB_articles_authors is empty, we can reconstruct it
 #by reading the MSGDB stored and get all msg_s published  
 def buildDBArticlesAuthors():
 
-    global AUTHORSDB
-
     global DB_articles_authors
 
     global MSGDB
 
-    print('\nMessages on Tangle\n')
+    print('Building the local DB of message_id...\n')
 
     for i in range (len(MSGDB)):
         message_id = MSGDB[i]
@@ -398,25 +385,42 @@ def buildDBArticlesAuthors():
         #for each msg in the MSGDB retrieve its info
         message = client.get_message_data(message_id)
 
-        author_seed = message['payload']['indexation'][0]['index']
-        author_seed = (bytes.fromhex(author_seed).decode('utf-8'))
-    
         parents = message['parents']
+
+        #print("MESSAGE:")
+        #print(message)
+
+        #non mi serve qua
+        index = message['payload']['indexation'][0]['index']
+        index = (bytes.fromhex(index).decode('utf-8'))
+    
+        #print(index)
+
+        data = message['payload']['indexation'][0]['data']
+        data = str(bytearray(data).decode('utf-8'))
+        #print(data)
+
+        data_splitted = data.split('#')
+
+        author_pub_key_string = data_splitted[1]
+
+        #signature_string = data_splitted[2]
+
+        #text_data_string = data_splitted[3]
+
+
 
 
         for parent_id in parents:
-            #the parent msg's author_seed will be retrieved, since if a msg is cited => its author is already in the DB 
-            addRowToDB(message_id, author_seed, parent_id)
+            #the parent msg's author_pub_key will be retrieved, since if a msg is cited => its author is already in the DB 
+            addRowToDB(message_id, author_pub_key_string, parent_id)
         #print('#######')
 
-    DB_articles_authors.to_csv('./DB_articles_authors2.csv',index = False)
+    DB_articles_authors.to_csv('./DB_articles_authors_built.csv',index = False)
 
-#write a new Author Seed to the DB file
-def writeNewSeedAuthor(author_Seed):
-    
-    file = open("lista_seed_autori.txt", "a")
-    file.write(author_Seed+'\n')        
-    file.close() 
+    print('DB_articles_authors reconstructed\n')
+
+    return DB_articles_authors
 
 
 #write a new msg id to the DB file
@@ -428,26 +432,12 @@ def writeNewMsg(msg_id):
 
 
 
-#load the index authors list from DB file to a Global variable
-def readIndexAuthorsList():
-    try: 
-        file = open("lista_seed_autori.txt", "r")
-        index_authors_list = file.readlines()
-
-        for i in range(len(index_authors_list)):
-            index_authors_list[i] = index_authors_list[i].replace("\n", "")
-
-        print(f'Found #{len(index_authors_list)} authors from the file lista_seed_autori.txt \n')
-    except:
-        
-        index_authors_list = []
-
-    return index_authors_list
 
 
 
 #load the msg_id list from DB file to a Global variable
 def readMsgDB():
+    print('Checking for local message_id stored...\n')
     try: 
         file = open("lista_msgDB.txt", "r")
         msg_DB = file.readlines()
@@ -463,25 +453,39 @@ def readMsgDB():
     return msg_DB
 
 
+#VARIABLES DEFINED HERE ARE VISIBILE EVERYWHERE.
+#IF I WANT TO MODIFY/USE THEM INSIDE A FUN, I'VE TO REFER TO THEM THROUGH "GLOBAL"
+#KEYWORD INSIDE THAT FUN, OR IT WILL CREATE ANOTHER LOCAL VAR
+
+
+#queue used to synch the messages loader and the MQTT messages receiver 
+Queue = queue.Queue(maxsize=1)
+
+# create a client with a node
+client = iota_client.Client(
+    nodes_name_password=[['http://0.0.0.0:14265']])
+
+
+MSGDB = readMsgDB()
+
+DB_articles_authors = pd.DataFrame(columns=['FromNodeId', 'From_Author_Pub_Key','ToNodeId', 'To_Author_Pub_key'])
+
+
 
 
 def main():
 
     print("\n##########")
+    print('Starting init operation for setup...\n')
 
-    global DB_articles_authors
-
-    #if present, load the DB storing msgs and authors of the tangle
-
-    global AUTHORSDB
-    AUTHORSDB = readIndexAuthorsList()
-
-    global MSGDB
-    MSGDB = readMsgDB()
+    #se ci sono messaggi memorizzati in locale, ricostruisco subito il DB locale di msgs
+    if(len(MSGDB)>0):
+        DB_articles_authors = buildDBArticlesAuthors()
+        
 
     #subscribe to MQTT topic    
     client.subscribe_topic('messages',MQTT_callback)
-    print('MQTT Subscription')
+    print('MQTT Subscription done\n')
 
     user_command = ''
 
