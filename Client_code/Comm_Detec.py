@@ -199,12 +199,7 @@ def calcolaMerge(E_matrix):
     
     #2: SE NUM COLONNE > 2 && ESISTONO SOLO CLUSTER CHE NON HANNO COLLEGAMENTI/ARCHI TRA LORO
 
-#funzioni usate per fare str replacement
-def replaceInit(row):
-    return row.replace('-----BEGIN PUBLIC KEY-----\n','')
 
-def replaceEnd(row):
-    return row.replace('\n-----END PUBLIC KEY-----\n','')
 
 
 def main():
@@ -212,21 +207,10 @@ def main():
     DF = pd.read_csv('./AM_Matrix.csv')
     DF.rename(columns={'Unnamed: 0':'From'}, inplace = True)
     DF.set_index('From',inplace = True,drop=True)
-
-    #setto i valori lungo diagonale a 0 => auto citazioni a 0
-    for i in DF.columns.values:
-        DF.loc[i][i] = 0
-
-    #faccio str replacement
-    repI = np.vectorize(replaceInit)
-
-    repE = np.vectorize(replaceEnd)
-
-    DF.columns = repI(DF.columns)
-    DF.columns = repE(DF.columns)
-
     DF['FROM'] = DF.columns
     DF.set_index('FROM', inplace = True)
+    DF.to_csv('./AM_Matrix.csv',index = False)
+
     
     #SETTO A 0 I VALORI SULLA DIAGONALE => AUTOCITAZIONI, NON DOVENDO CONSIDERARLE
     for i in DF.columns.values:

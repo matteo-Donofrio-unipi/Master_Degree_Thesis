@@ -2,6 +2,12 @@ import iota_client
 import pandas as pd 
 import os 
 import hashlib
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives import serialization
+from cryptography.exceptions import InvalidSignature
 
 
 # user_command can be 'get_msg_by_author', 'get_msg_by_id', 'send_msg',
@@ -10,7 +16,7 @@ import hashlib
 
 
 #get messages by author index (author seed)
-def getMsgByAuthor(client, index_key_author):
+def getMsgByIndex(client, index_key_author):
 
     print("Message data\n")
 
@@ -133,33 +139,259 @@ def sendEmptyMsg(client, seed):
     id = message['message_id']
     print(id)
 
-def send_first_article(client,seed):
+#LOAD THE FIRST ARTICLE THAT WILL BE RECEIVE A SPAM BOOST
+def send_first_article(client):
     
-    data_of_payload = getDataFromFile()
-    #print(type(data))
-    
-    message = client.message(index=seed, data_str=data_of_payload, parents = [str('537757c9c53bff3b1cd406e13e6b9695b6939e5bb56e24cee6ef588898326fee')])
-    #print(message)
+    #creo un nuovo utente con rispettiva chiave privata e pubblica
+    private_key = rsa.generate_private_key(
+    public_exponent=65537,
+    key_size=2048,
+    )
+
+    pub_key = private_key.public_key()
+
+    #private_pem_bytes = str.encode(private_pem_string)
+    #public_pem_bytes = str.encode(public_pem_string)
 
 
-def send_spam(client):
-    
-    #generate new seed
-    new_seed = hashlib.sha256(os.urandom(256)).hexdigest()
+    message_txt_data_string = str('ARTICOLO CHE DEVE RICEVERE SPAM ATTACK. CRICCA ATTACK')
+    message_txt_data_bytes = str.encode(message_txt_data_string)
 
-    print('PRIMA')
-    r = client.message(index=new_seed, data_str='SPAM-', parents = [str('584c595c674b1a819f2961507edd691402e844b564c66310c17f2cf0421a2fbd')])
-    print(r)
-    r = client.message(index=new_seed, data_str='SPAM-S', parents = [str('584c595c674b1a819f2961507edd691402e844b564c66310c17f2cf0421a2fbd')])
-    print(r)
-    r = client.message(index=new_seed, data_str='SPAM-SP', parents = [str('584c595c674b1a819f2961507edd691402e844b564c66310c17f2cf0421a2fbd')])
-    print(r)
-    r = client.message(index=new_seed, data_str='SPAM-SPA', parents = [str('584c595c674b1a819f2961507edd691402e844b564c66310c17f2cf0421a2fbd')])
-    print(r)
-    r = client.message(index=new_seed, data_str='SPAM-SPAM-SPAM', parents = [str('584c595c674b1a819f2961507edd691402e844b564c66310c17f2cf0421a2fbd')])
-    print(r)
-    print('DOPO')
-    #print(message)
+        #print(f'DECODIFICATO')
+
+    signature = private_key.sign(
+                message_txt_data_bytes,
+                padding.PSS(
+                    mgf=padding.MGF1(hashes.SHA256()),
+                    salt_length=padding.PSS.MAX_LENGTH
+                ),
+                hashes.SHA256()
+            )
+        #print('FIRMA FATTA')
+
+    signature_string = signature.hex()
+
+        #the '#' symbol is our separator
+
+    public_pem_string = pub_key.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo
+        ).decode()
+
+    message_data = '#'+public_pem_string+'#'+signature_string+'#'+message_txt_data_string+'#'
+
+    
+    
+    message = client.message(index='test_data', data_str=message_data, parents = [str('e3a9c9daf09a0343a3b151aa3222c7b9fbae01d26ade0e352eca2f7cffce96d7')])
+    print(f'INFO MESSAGGIO DA SPAMMARE{message}')
+
+#LOAD 60 ARTICLES THAT WILL SPAM BOOST THE ARTICLE SENT THROUGH send_first_article()
+def send_spam_single_spammer(client):
+    
+    #creo un nuovo utente con rispettiva chiave privata e pubblica
+    private_key = rsa.generate_private_key(
+    public_exponent=65537,
+    key_size=2048,
+    )
+
+    pub_key = private_key.public_key()
+
+
+    public_pem_string = pub_key.public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo
+            ).decode()
+
+    #private_pem_bytes = str.encode(private_pem_string)
+    #public_pem_bytes = str.encode(public_pem_string)
+
+    for i in range(1):
+
+        message_txt_data_string = str('ARTICOLO CHE DEVE SPAMMARE-EFFETTUARE ATTACCO SPAM, 1-60')
+        message_txt_data_string = message_txt_data_string+str(i)
+        message_txt_data_bytes = str.encode(message_txt_data_string)
+
+            #print(f'DECODIFICATO')
+
+        signature = private_key.sign(
+                    message_txt_data_bytes,
+                    padding.PSS(
+                        mgf=padding.MGF1(hashes.SHA256()),
+                        salt_length=padding.PSS.MAX_LENGTH
+                    ),
+                    hashes.SHA256()
+                )
+            #print('FIRMA FATTA')
+
+        signature_string = signature.hex()
+
+            #the '#' symbol is our separator
+
+        message_data = '#'+public_pem_string+'#'+signature_string+'#'+message_txt_data_string+'#'
+
+        
+        
+        message = client.message(index='test_data', data_str=message_data, parents = [str('4478b794ce0eb4f55db194e2f52298e567c961733fbb375d7df33004eb848d6b')])
+        print(message)
+
+
+#LOAD 60 ARTICLES THAT WILL SPAM BOOST THE ARTICLE SENT THROUGH send_first_article()
+def send_spam_many_spammers(client):
+    
+    for i in range(15):
+        #creo un nuovo utente con rispettiva chiave privata e pubblica
+        private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
+        )
+
+        pub_key = private_key.public_key()
+
+
+        public_pem_string = pub_key.public_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PublicFormat.SubjectPublicKeyInfo
+                ).decode()
+
+        #private_pem_bytes = str.encode(private_pem_string)
+        #public_pem_bytes = str.encode(public_pem_string)
+
+        for j in range(1):
+
+            message_txt_data_string = str('ARTICOLO CHE DEVE SPAMMARE-EFFETTUARE ATTACCO SPAM INCREMENTALE')
+            message_txt_data_string = message_txt_data_string+str(j)+str(i)
+            message_txt_data_bytes = str.encode(message_txt_data_string)
+
+                #print(f'DECODIFICATO')
+
+            signature = private_key.sign(
+                        message_txt_data_bytes,
+                        padding.PSS(
+                            mgf=padding.MGF1(hashes.SHA256()),
+                            salt_length=padding.PSS.MAX_LENGTH
+                        ),
+                        hashes.SHA256()
+                    )
+                #print('FIRMA FATTA')
+
+            signature_string = signature.hex()
+
+                #the '#' symbol is our separator
+
+            message_data = '#'+public_pem_string+'#'+signature_string+'#'+message_txt_data_string+'#'
+
+            
+            
+            message = client.message(index='test_data', data_str=message_data, parents = [str('189494881420f7947c99d473fcd6dea3dfca609e50b8f41006d3d279f801692f')])
+            print(message)
+
+
+#LOAD 60 ARTICLES THAT WILL SPAM BOOST THE ARTICLE SENT THROUGH send_first_article()
+def send_spam_clique(client):
+    
+    PR_keys_list = []
+
+
+
+    msg_id_spammers = []
+
+    len_clique = 40
+
+    for i in range(len_clique):
+        #creo un nuovo utente con rispettiva chiave privata e pubblica
+        print(f'I PRIMO SPAM: {i}')
+        private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
+        )
+
+        PR_keys_list.append(private_key)
+
+
+        pub_key = private_key.public_key()
+
+
+        public_pem_string = pub_key.public_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PublicFormat.SubjectPublicKeyInfo
+                ).decode()
+
+        #private_pem_bytes = str.encode(private_pem_string)
+        #public_pem_bytes = str.encode(public_pem_string)
+
+        for j in range(1):
+
+            message_txt_data_string = str('ARTICOLO CHE DEVE SPAMMARE-EFFETTUARE ATTACCO SPAM CLIQUE')
+            message_txt_data_string = message_txt_data_string+str(j)+str(i)
+            message_txt_data_bytes = str.encode(message_txt_data_string)
+
+                #print(f'DECODIFICATO')
+
+            signature = private_key.sign(
+                        message_txt_data_bytes,
+                        padding.PSS(
+                            mgf=padding.MGF1(hashes.SHA256()),
+                            salt_length=padding.PSS.MAX_LENGTH
+                        ),
+                        hashes.SHA256()
+                    )
+                #print('FIRMA FATTA')
+
+            signature_string = signature.hex()
+
+                #the '#' symbol is our separator
+
+            message_data = '#'+public_pem_string+'#'+signature_string+'#'+message_txt_data_string+'#'
+
+            
+            
+            message = client.message(index='test_data', data_str=message_data, parents = [str('74ebc5dfab1b0648ac2a71d976891208ed5cba88d44bcaaca50bd38ad94f9b1c')])
+            
+            msg_id= message['message_id']
+            msg_id_spammers.append(msg_id)
+            
+            
+    
+    for i in range(len_clique):
+
+        PR_key_spammer = PR_keys_list[i]
+        pub_key_spammer = PR_key_spammer.public_key()
+        public_pem_string = pub_key_spammer.public_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PublicFormat.SubjectPublicKeyInfo
+                ).decode()
+        
+        for j in range(len_clique):
+            if(i!=j):
+                message_txt_data_string = str('ARTICOLO CHE DEVE SPAMMARE-EFFETTUARE ATTACCO SPAM CLIQUE- CITA AMICO CLIQUE')
+                message_txt_data_string = message_txt_data_string+str(j)+str(i)
+                message_txt_data_bytes = str.encode(message_txt_data_string)
+
+                    #print(f'DECODIFICATO')
+
+                signature = PR_key_spammer.sign(
+                            message_txt_data_bytes,
+                            padding.PSS(
+                                mgf=padding.MGF1(hashes.SHA256()),
+                                salt_length=padding.PSS.MAX_LENGTH
+                            ),
+                            hashes.SHA256()
+                        )
+                    #print('FIRMA FATTA')
+
+                signature_string = signature.hex()
+
+                    #the '#' symbol is our separator
+
+                message_data = '#'+public_pem_string+'#'+signature_string+'#'+message_txt_data_string+'#'
+
+            
+            
+                message = client.message(index='test_data', data_str=message_data, parents = [str(msg_id_spammers[j])])
+            
+            print(f'I: {i}, J: {j}')
+
+
 
 
 def getBalance(client, address):
@@ -280,7 +512,7 @@ def main():
 
         elif(user_command=='get_msg_by_author'):
             index_author = input("Please enter an author index:\n")
-            getMsgByAuthor(client, index_author)
+            getMsgByIndex(client, index_author)
 
         elif(user_command=='get_balance'):
             getBalance(client, address)
@@ -303,11 +535,19 @@ def main():
         #elif(user_command == 'LAD'):
         #    loadArxivDataset(client)
 
-        elif(user_command == 'SS'): #send spam
-            send_spam(client)
+        elif(user_command == 'SSS'): #send spam
+            send_spam_single_spammer(client)
 
-        elif(user_command == 'FS'): #first article to be spammed
-            send_first_article(client,seed)
+        elif(user_command == 'SMS'): #send spam
+            send_spam_many_spammers(client)
+
+        elif(user_command == 'SFS'): #first article to be spammed
+            send_first_article(client)
+
+        elif(user_command == 'SSC'): #first article to be spammed
+            send_spam_clique(client)
+
+            
 
         print("\n##########\n")
 
