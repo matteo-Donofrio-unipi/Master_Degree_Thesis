@@ -15,16 +15,6 @@ from timeit import default_timer as timer
 
 
 
-
-
-
-
-
-
-
-
-
-
 def addRowToDB(FromNodeId, From_author_pub_key, ToNodeId):
     #'FromNodeId', 'From_Author_Pub_Key','ToNodeId', 'To_Author_Pub_key'
     #HERE THE 'ToNodeId' VALUE IS THE ID OF THE PARENT MESSAGE CITED BY THE NEW PUB MSG
@@ -239,31 +229,81 @@ def computePageRank():
 #Per ogni community, calcola la distanza media tra di essa e tutte le altre.
 #Poi viene restituita la distanza media minore.
 
-def computeMinOfHopAvgDist(communities_citanti, max_len, path):
+#Fornito in input un set di ids delle communities che citano un articolo & community autore articolo citato
+#Per ogni community, calcola la distanza media tra di essa e tutte le altre.
+#Poi viene restituita la distanza media minore.
+
+#viene invocata solo se il numero di communities coinvolte è > 1 => l'articolo è citato da almeno una community diversa da quella del suo autore
+
+def computeMinOfHopAvgDist(communities_coinvolte, max_len, path):
     
-    if(len(communities_citanti)>0):
+    min_avg_dist = max_len #init la distanza minore individuata finora al valore della distanza max
     
-        min_avg_dist = max_len #init la distanza minore individuata finora al valore della distanza max
-        for i in communities_citanti: #per ogni community citante
-
-            local_avg_dist = 0
-
-            for j in communities_citanti: #scandisco le altre communities citanti
-                if(i!=j):
-                    if(str(j) in path[str(i)]):
-                        local_avg_dist += len(path[str(i)][str(j)])-1 #se esiste path tra loro, prendo il num di hop
-                    else:
-                        local_avg_dist += max_len #se non esiste path tra loro, assumo #hop massimo nel grafo PERCHE maggiore è la distanza e maggiore è il punteggio assegnato
-
-            local_avg_dist = local_avg_dist/len(communities_citanti) #calcolo media distanza tra la community e le altre
-
-            if(local_avg_dist < min_avg_dist):
-                min_avg_dist = local_avg_dist
-
-        return min_avg_dist
+    #print(f'COMP, comm_coinvolte: {communities_coinvolte}')
     
-    else:
-        return 0
+    for i in communities_coinvolte: #per ogni community citante
+        
+        #print(f'I: {i}')
+        
+        local_avg_dist = 0
+
+        for j in communities_coinvolte: #scandisco le altre communities citanti
+            #print(f'J: {j}')
+            if(i!=j):
+                if(str(j) in path[str(i)]):
+                    local_avg_dist += len(path[str(i)][str(j)])-1 #se esiste path tra loro, prendo il num di hop
+                    #print(f'LAD1: {local_avg_dist}')
+                else:
+                    local_avg_dist += max_len #se non esiste path tra loro, assumo #hop massimo nel grafo PERCHE maggiore è la distanza e maggiore è il punteggio assegnato
+                    #print(f'LAD2: {local_avg_dist}')
+                    
+        local_avg_dist = local_avg_dist/(len(communities_coinvolte)-1) #calcolo media distanza tra la community e le altre (che in numero sono len(communities_coinvolte)-1)
+            
+        #print(f'LAD3: {local_avg_dist}')
+            
+            
+        if(local_avg_dist > 0 and local_avg_dist < min_avg_dist):
+            min_avg_dist = local_avg_dist
+
+    return min_avg_dist
+
+
+
+
+
+
+def computeAvgOfHopAvgDist(communities_coinvolte, max_len, path):
+    
+
+    avg_dist = 0 #init la distanza media
+    
+    #print(f'COMP, comm_coinvolte: {communities_coinvolte}')
+    
+    for i in communities_coinvolte: #per ogni community citante
+        
+        #print(f'I: {i}')
+        
+        local_avg_dist = 0
+
+        for j in communities_coinvolte: #scandisco le altre communities citanti
+            #print(f'J: {j}')
+            if(i!=j):
+                if(str(j) in path[str(i)]):
+                    local_avg_dist += len(path[str(i)][str(j)])-1 #se esiste path tra loro, prendo il num di hop
+                    #print(f'LAD1: {local_avg_dist}')
+                else:
+                    local_avg_dist += max_len #se non esiste path tra loro, assumo #hop massimo nel grafo PERCHE maggiore è la distanza e maggiore è il punteggio assegnato
+                    #print(f'LAD2: {local_avg_dist}')
+                    
+        local_avg_dist = local_avg_dist/(len(communities_coinvolte)-1) #calcolo media distanza tra la community e le altre (che in numero sono len(communities_coinvolte)-1)
+            
+        #print(f'LAD3: {local_avg_dist}')
+            
+            
+        avg_dist += local_avg_dist
+
+    return avg_dist/len(communities_coinvolte)
+
 
 
 def replaceSlash(row):
@@ -318,7 +358,7 @@ def computeCommunitiesSplitted(Communities):
 
 
 
-def computeArticlesEstimate():
+def computeArticlesEstimate(a,b,c,d):
 
     print('\nStarting estimate computation\n')
     
@@ -388,43 +428,61 @@ def computeArticlesEstimate():
 
     stima = []
 
-    a = 0.2
-    b = 0.2
-    c = 0.2
-    d = 0.4
-
     for m in MSGDB:
 
         autore = DB_AA_originale[DB_AA_originale['FromNodeId']==m]['From_Author_Pub_Key'].values[0]
         PR_autore = PR_df[PR_df['Author']==autore]['PR_values'].values[0]
         num_cit_entranti = len(DB_AA_originale[DB_AA_originale['To_Author_Pub_key']==autore])
-        autori_citanti = DB_AA_originale[DB_AA_originale['To_Author_Pub_key']==autore]['From_Author_Pub_Key'].values
         
-        if(len(autori_citanti)>0):
+        if(num_cit_entranti > 0):
+        
+            autori_citanti = DB_AA_originale[DB_AA_originale['To_Author_Pub_key']==autore]['From_Author_Pub_Key'].values
+
+
             AVG_PR_autori_citanti = PR_df[PR_df['Author'].isin(autori_citanti)]['PR_values'].values.mean()
+
+            #print(autori_citanti)
+
+            #calcolo la distanza tra le communities che mi citano 
+            
+            
+            communities_coinvolte = []
+            
+            autori_coinvolti = autori_citanti 
+            autori_coinvolti = np.append(autori_coinvolti,autore)
+            
+            #in questo modo insierisco anche la community dell'autore dell'articolo 
+            #=> calcolo la distanza media tra tutte le communities coinvolte, quelle dell'autore citato e citante 
+
+            for i in autori_coinvolti:
+                for j in range(len(Communities_splitted)):
+                    if(i in Communities_splitted.loc[j]['authors'] ):
+                        communities_coinvolte.append(j)
+
+            communities_coinvolte = np.unique(communities_coinvolte) #rimuovo duplicati
+            #len(communities_coinvolte)>=1, poiche contiene sempre la community dell'autore dell'articolo, piu quelle citanti
+            
+            #len(communities_coinvolte) = 1 quando la community che cita è la stessa dell'autore che ha scritto articolo
+            
+            #print(communities_coinvolte)
+            
+            if(len(communities_coinvolte)==1):
+            
+                stima_veridicita_articoli.loc[m]['estimate'] = a*((PR_autore-PR_Min)/PR_Difference) + b*((num_cit_entranti-cit_entranti_min)/cit_entranti_Difference) + c*((AVG_PR_autori_citanti-PR_Min)/PR_Difference)  
+            
+            else:
+
+                Min_of_hop_avg_dist = computeMinOfHopAvgDist(communities_coinvolte, max_len, path)
+                
+                if(Min_of_hop_avg_dist<1):
+                    print(Min_of_hop_avg_dist)
+
+                stima_veridicita_articoli.loc[m]['estimate'] = a*((PR_autore-PR_Min)/PR_Difference) + b*((num_cit_entranti-cit_entranti_min)/cit_entranti_Difference) + c*((AVG_PR_autori_citanti-PR_Min)/PR_Difference) + d*((Min_of_hop_avg_dist-min_len)/len_Difference)  
+        
         else:
-            AVG_PR_autori_citanti = 0
-        #print(autori_citanti)
-
-        #calcolo la distanza tra le communities che mi citano
-
-        communities_citanti = []
-
-        for i in autori_citanti:
-            for j in range(len(Communities_splitted)):
-                if(i in Communities_splitted.loc[j]['authors'] ):
-                    communities_citanti.append(j)
-
-        communities_citanti = np.unique(communities_citanti)
-
-        Min_of_hop_avg_dist = computeMinOfHopAvgDist(communities_citanti, max_len, path)
-        
-        if(Min_of_hop_avg_dist<1):
-            Min_of_hop_avg_dist = 1
-        #X_normalized = (X - X_min) / (X_max - X_min)
-        
-        stima_veridicita_articoli.loc[m]['estimate'] = a*((PR_autore-PR_Min)/PR_Difference) + b*((num_cit_entranti-cit_entranti_min)/cit_entranti_Difference) + c*((AVG_PR_autori_citanti-PR_Min)/PR_Difference) + d*((Min_of_hop_avg_dist-min_len)/len_Difference)  
-        
+            stima_veridicita_articoli.loc[m]['estimate'] = a*((PR_autore-PR_Min)/PR_Difference)        
+    
+    
     stima_veridicita_articoli.to_csv('./stima_veridicita_articoli.csv')
 
     print(stima_veridicita_articoli.estimate.max())
@@ -499,7 +557,7 @@ def main():
                 PR_df = computePageRank()
             
             elif(user_command == 'AE'):
-                estimate_df =  computeArticlesEstimate()
+                estimate_df =  computeArticlesEstimate(0.2,0.2,0.2,0.4)
 
 
 

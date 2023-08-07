@@ -213,17 +213,17 @@ def main():
 
     
     #SETTO A 0 I VALORI SULLA DIAGONALE => AUTOCITAZIONI, NON DOVENDO CONSIDERARLE
-    for i in DF.columns.values:
-        DF.loc[i][i] = 0
+    #for i in DF.columns.values:
+    #    DF.loc[i][i] = 0
 
 
     #RIMUOVO LE RIGHE E LE COLONNE CONTENENTI AUTORI CHE NON CITANO E NON VENGONO CITATI DA NESSUNO
     #(SONO AUTORI CHE ERANO DI FRONTIERA => non citavano nessuno E SI AUTOCITAVANO SOLAMENTE)
 
-    for i in DF.columns.values: 
-        if(DF.loc[i].sum()==0 and DF[i].sum()==0):
-            DF.drop(index = i, inplace=True)
-            DF.drop([i], axis = 1, inplace=True)    
+    #for i in DF.columns.values: 
+    #    if(DF.loc[i].sum()==0 and DF[i].sum()==0):
+    #        DF.drop(index = i, inplace=True)
+    #        DF.drop([i], axis = 1, inplace=True)    
 
     #DF
 
