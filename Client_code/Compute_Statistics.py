@@ -443,9 +443,8 @@ def computeArticlesEstimate(a,b,c,d):
 
             #print(autori_citanti)
 
-            #calcolo la distanza tra le communities che mi citano 
-            
-            
+            #calcolo la distanza tra le communities (insieme composto da community autore citato e communities autori citanti)
+
             communities_coinvolte = []
             
             autori_coinvolti = autori_citanti 
@@ -460,12 +459,11 @@ def computeArticlesEstimate(a,b,c,d):
                         communities_coinvolte.append(j)
 
             communities_coinvolte = np.unique(communities_coinvolte) #rimuovo duplicati
-            #len(communities_coinvolte)>=1, poiche contiene sempre la community dell'autore dell'articolo, piu quelle citanti
             
-            #len(communities_coinvolte) = 1 quando la community che cita è la stessa dell'autore che ha scritto articolo
+            #len(communities_coinvolte) SEMPRE >=1, poiche contiene almeno la community dell'autore citato, piu quelle citanti
             
-            #print(communities_coinvolte)
-            
+
+            #len(communities_coinvolte) = 1 quando la community che cita è la stessa dell'autore che ha scritto articolo 
             if(len(communities_coinvolte)==1):
             
                 stima_veridicita_articoli.loc[m]['estimate'] = a*((PR_autore-PR_Min)/PR_Difference) + b*((num_cit_entranti-cit_entranti_min)/cit_entranti_Difference) + c*((AVG_PR_autori_citanti-PR_Min)/PR_Difference)  
@@ -475,6 +473,7 @@ def computeArticlesEstimate(a,b,c,d):
                 Min_of_hop_avg_dist = computeMinOfHopAvgDist(communities_coinvolte, max_len, path)
                 
                 if(Min_of_hop_avg_dist<1):
+                    print('ERROR')
                     print(Min_of_hop_avg_dist)
 
                 stima_veridicita_articoli.loc[m]['estimate'] = a*((PR_autore-PR_Min)/PR_Difference) + b*((num_cit_entranti-cit_entranti_min)/cit_entranti_Difference) + c*((AVG_PR_autori_citanti-PR_Min)/PR_Difference) + d*((Min_of_hop_avg_dist-min_len)/len_Difference)  
@@ -492,6 +491,15 @@ def computeArticlesEstimate(a,b,c,d):
     print('Computation of estimation finished\n')
 
     return stima_veridicita_articoli
+
+
+
+#########################
+# NB: nel calcolo della stima, gestisco i vari casi usando parti di formula (solo a*, a+b+c, a+b+c+d).
+# Perche se avessi gestito i vari casi nella funzione computeMinOfHopAvgDist(), quando non c'erano citazioni restituiva 0
+# ma poiche tale valore calcolato va normalizzato, veniva fuori (0-min_len)/len_Difference
+# che generava stime negative => errore.
+#########################
     
 
 #load the msg_id list from DB file to a Global variable
