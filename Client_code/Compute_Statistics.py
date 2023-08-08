@@ -565,7 +565,11 @@ def main():
                 PR_df = computePageRank()
             
             elif(user_command == 'AE'):
-                estimate_df =  computeArticlesEstimate(0.2,0.2,0.2,0.4)
+                a = 0.1
+                b = 0.2
+                c = 0.35
+                d = 0.35
+                estimate_df =  computeArticlesEstimate(a,b,c,d)
 
 
 
