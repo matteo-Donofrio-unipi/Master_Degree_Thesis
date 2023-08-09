@@ -426,71 +426,117 @@ def computeArticlesEstimate(a,b,c,d):
 
     #CALCOLO EFFETTIVO DELLA STIMA DI VERIDICITA DI OGNI ARTICOLO
 
-    stima = []
+    df_stima_analysis = pd.DataFrame(columns = ['article_id'], index = range(len(MSGDB)))
 
-    for m in MSGDB:
+    df_stima_analysis['article_id'] = MSGDB
 
-        autore = DB_AA_originale[DB_AA_originale['FromNodeId']==m]['From_Author_Pub_Key'].values[0]
-        PR_autore = PR_df[PR_df['Author']==autore]['PR_values'].values[0]
-        num_cit_entranti = len(DB_AA_originale[DB_AA_originale['To_Author_Pub_key']==autore])
-        
-        if(num_cit_entranti > 0):
-        
-            autori_citanti = DB_AA_originale[DB_AA_originale['To_Author_Pub_key']==autore]['From_Author_Pub_Key'].values
+    df_stima_analysis['estimate'] = None
+
+    df_stima_analysis['PR_author'] = None
+
+    df_stima_analysis['PR_author'] = df_stima_analysis.apply(lambda row : PR_df[PR_df['Author'] == DB_AA_originale[DB_AA_originale['FromNodeId']==row['article_id']]['From_Author_Pub_Key'].values[0]]['PR_values'].values[0], axis = 1)
+
+    ##
+
+    df_stima_analysis['Num_cit_received'] = None
+
+    df_stima_analysis['Num_cit_received'] = df_stima_analysis.apply(lambda row : len(DB_AA_originale[DB_AA_originale['ToNodeId']==row['article_id']]), axis = 1)
+
+    ##
+
+    df_stima_analysis['Avg_Pr_citing_authors'] = None
+
+    df_stima_analysis['Avg_Pr_citing_authors'] = df_stima_analysis.apply(lambda row: PR_df[PR_df['Author'].isin(DB_AA_originale[DB_AA_originale['ToNodeId']==row['article_id']]['From_Author_Pub_Key'].values)]['PR_values'].mean(), axis = 1)
+
+    ##
+
+    df_stima_analysis['Min_of_avg_dist_among_communities'] = None
+
+    Min_of_hop_avg_dist_list = []
+    estimate_list  =  []
 
 
-            AVG_PR_autori_citanti = PR_df[PR_df['Author'].isin(autori_citanti)]['PR_values'].values.mean()
+    #Min_of_hop_avg_dist = valore => articolo citato da almeno una community che non è la sua di appartenenza
+    #Min_of_hop_avg_dist = 0 => articolo citato da nessuno
+    #Min_of_hop_avg_dist = -1 => articolo citato solo dalla sua community di appartenenza
 
-            #print(autori_citanti)
 
-            #calcolo la distanza tra le communities (insieme composto da community autore citato e communities autori citanti)
 
-            communities_coinvolte = []
+    for i in range(len(df_stima_analysis)):
+
+            autore = DB_AA_originale[DB_AA_originale['FromNodeId']==df_stima_analysis.iloc[i]['article_id']]['From_Author_Pub_Key'].values[0]
             
-            autori_coinvolti = autori_citanti 
-            autori_coinvolti = np.append(autori_coinvolti,autore)
-            
-            #in questo modo insierisco anche la community dell'autore dell'articolo 
-            #=> calcolo la distanza media tra tutte le communities coinvolte, quelle dell'autore citato e citante 
+            if(df_stima_analysis.iloc[i]['Num_cit_received'] > 0):
 
-            for i in autori_coinvolti:
-                for j in range(len(Communities_splitted)):
-                    if(i in Communities_splitted.loc[j]['authors'] ):
-                        communities_coinvolte.append(j)
+                autori_citanti = DB_AA_originale[DB_AA_originale['ToNodeId']==df_stima_analysis.iloc[i]['article_id']]['From_Author_Pub_Key'].values
 
-            communities_coinvolte = np.unique(communities_coinvolte) #rimuovo duplicati
-            
-            #len(communities_coinvolte) SEMPRE >=1, poiche contiene almeno la community dell'autore citato, piu quelle citanti
-            
+                #print(autori_citanti)
 
-            #len(communities_coinvolte) = 1 quando la community che cita è la stessa dell'autore che ha scritto articolo 
-            if(len(communities_coinvolte)==1):
-            
-                stima_veridicita_articoli.loc[m]['estimate'] = a*((PR_autore-PR_Min)/PR_Difference) + b*((num_cit_entranti-cit_entranti_min)/cit_entranti_Difference) + c*((AVG_PR_autori_citanti-PR_Min)/PR_Difference)  
-            
+                #calcolo la distanza tra le communities che mi citano 
+
+
+                communities_coinvolte = []
+
+                autori_coinvolti = autori_citanti 
+                autori_coinvolti = np.append(autori_coinvolti,autore)
+
+                #in questo modo insierisco anche la community dell'autore dell'articolo 
+                #=> calcolo la distanza media tra tutte le communities coinvolte, quelle dell'autore citato e citante 
+
+                for k in autori_coinvolti:
+                    for j in range(len(Communities_splitted)):
+                        if(k in Communities_splitted.loc[j]['authors'] ):
+                            communities_coinvolte.append(j)
+
+                communities_coinvolte = np.unique(communities_coinvolte) #rimuovo duplicati
+                #len(communities_coinvolte)>=1, poiche contiene sempre la community dell'autore dell'articolo, piu quelle citanti
+
+                #len(communities_coinvolte) = 1 quando la community che cita è la stessa dell'autore che ha scritto articolo
+
+                #print(communities_coinvolte)
+
+                if(len(communities_coinvolte)==1):
+                    
+                    estimate_list.append(a*((df_stima_analysis.iloc[i]['PR_author']-PR_Min)/PR_Difference) + b*((df_stima_analysis.iloc[i]['Num_cit_received']-cit_entranti_min)/cit_entranti_Difference) + c*((df_stima_analysis.iloc[i]['Avg_Pr_citing_authors']-PR_Min)/PR_Difference))
+                    #stima_veridicita_articoli.loc[m]['estimate'] = a*((PR_autore-PR_Min)/PR_Difference) + b*((num_cit_entranti-cit_entranti_min)/cit_entranti_Difference) + c*((AVG_PR_autori_citanti-PR_Min)/PR_Difference)  
+                    Min_of_hop_avg_dist_list.append(-1)
+                    
+                else:
+
+                    Min_of_hop_avg_dist = computeMinOfHopAvgDist(communities_coinvolte, max_len, path)
+
+                    
+                    Min_of_hop_avg_dist_list.append(Min_of_hop_avg_dist)
+
+                    
+                    if(Min_of_hop_avg_dist<1):
+                        print(Min_of_hop_avg_dist)
+                    
+                    estimate_list.append(a*((df_stima_analysis.iloc[i]['PR_author']-PR_Min)/PR_Difference) + b*((df_stima_analysis.iloc[i]['Num_cit_received']-cit_entranti_min)/cit_entranti_Difference) + c*((df_stima_analysis.iloc[i]['Avg_Pr_citing_authors']-PR_Min)/PR_Difference) + d*((Min_of_hop_avg_dist-min_len)/len_Difference))
+                    #stima_veridicita_articoli.loc[m]['estimate'] = a*((PR_autore-PR_Min)/PR_Difference) + b*((num_cit_entranti-cit_entranti_min)/cit_entranti_Difference) + c*((AVG_PR_autori_citanti-PR_Min)/PR_Difference) + d*((Min_of_hop_avg_dist-min_len)/len_Difference)  
+
             else:
-
-                Min_of_hop_avg_dist = computeMinOfHopAvgDist(communities_coinvolte, max_len, path)
                 
-                if(Min_of_hop_avg_dist<1):
-                    print('ERROR')
-                    print(Min_of_hop_avg_dist)
+                Min_of_hop_avg_dist_list.append(0)
+                
+                estimate_list.append(a*((df_stima_analysis.iloc[i]['PR_author']-PR_Min)/PR_Difference))
+                
+                
+                
+    df_stima_analysis['estimate'] = estimate_list
 
-                stima_veridicita_articoli.loc[m]['estimate'] = a*((PR_autore-PR_Min)/PR_Difference) + b*((num_cit_entranti-cit_entranti_min)/cit_entranti_Difference) + c*((AVG_PR_autori_citanti-PR_Min)/PR_Difference) + d*((Min_of_hop_avg_dist-min_len)/len_Difference)  
+    df_stima_analysis['Min_of_avg_dist_among_communities'] = Min_of_hop_avg_dist_list
         
-        else:
-            stima_veridicita_articoli.loc[m]['estimate'] = a*((PR_autore-PR_Min)/PR_Difference)        
-    
-    
-    stima_veridicita_articoli.to_csv('./stima_veridicita_articoli.csv')
+    df_stima_analysis.to_csv('./df_stima_analysis.csv')
 
-    print(stima_veridicita_articoli.estimate.max())
-    print(stima_veridicita_articoli.estimate.mean())
-    print(stima_veridicita_articoli.estimate.min())
+    print(df_stima_analysis.estimate.max())
+    print(df_stima_analysis.estimate.mean())
+    print(df_stima_analysis.estimate.min())
+    print(df_stima_analysis.estimate.std())
 
     print('Computation of estimation finished\n')
 
-    return stima_veridicita_articoli
+    return df_stima_analysis
 
 
 
@@ -566,9 +612,9 @@ def main():
             
             elif(user_command == 'AE'):
                 a = 0.1
-                b = 0.2
-                c = 0.35
-                d = 0.35
+                b = 0.1
+                c = 0.5
+                d = 0.3
                 estimate_df =  computeArticlesEstimate(a,b,c,d)
 
 
