@@ -12,9 +12,7 @@ from timeit import default_timer as timer
 
 def scaleValues(E_matrix):
     #calcolo il total weight sul grafo
-    W = 0
-    for i in E_matrix.columns.values:
-        W += E_matrix.loc[i].sum()
+    W = E_matrix.sum().sum()
     print(f'Total weight: {W}')
     
     def scale(x):
@@ -263,7 +261,7 @@ def main():
 
     #all'interno di ogni colonna, ci sono più pub_key collegate tra loro dal char '*'
     for i in clusters_authors:
-        if('-' in i):
+        if('*' in i):
             size_of_cluster.append(len(i.split("*")))
         else:
             size_of_cluster.append(1)

@@ -350,9 +350,8 @@ def computeCommunitiesSplitted(Communities):
     Communities_splitted.set_index('community',inplace = True)
 
 
-    for i in range(len(Communities)):
-        autori = Communities.loc[i]['cluster_authors'].split("*")
-        Communities_splitted.loc[i]['authors'] = autori
+    Communities_splitted['authors'] = Communities['cluster_authors'].apply(lambda row: row.split("*"))
+
 
     return Communities_splitted
 
