@@ -1,0 +1,40 @@
+sudo service docker start: avvia docker on wsl2
+
+docker compose start: start compose
+
+docker ps: mostra container in esecuzione 
+
+docker image ls: lista delle immagini salvate in locale 
+
+docker stop <the-container-id>: stoppa il container
+
+docker rm <the-container-id>: rimuove il container
+
+docker run -dp 3000:3000 getting-started: starta l'immagine, dopo aver fatto il bind -> porta_host-porta_container
+
+docker exec <containder-id> [OPTIONS] CONTAINER COMMAND [ARG...]: accede al container ed esegue il comando dato
+
+NB: quando si lancia un container si associa l'istruzione/i da eseguire. Quando queste terminano il container passa dallo stato "running" -> "Exited"
+
+#################### VOLUME ############à
+
+docker volume create name_db: crea volume all'interno dell'host con il nome relativo 
+
+docker run --mount type=volume, src=todo-db, target=/etc/todos nome-immagine: lancia il container e associa il volume specificando il suo nome e path
+
+docker volume inspect nome_db: resistuisce info sul volume 
+
+docker volume ls: lista dei Volumes
+
+
+################à BIND ###################
+
+docker run -dp 3000:3000 \
+    -w /app --mount type=bind,src="$(pwd)",target=/app \
+    node:18-alpine \
+    sh -c "yarn install && yarn run dev": monta il bind nel container, con src specifica la cartella dell'host che sarà usata per salvare i dati, con target specifica il path in cui verrà creato il mirror all'interno del container. Ora nel container esiste un mirror della cartella contenuta nell'host, verrà usata come memoria "condivisa". node:18-alpine è il nome dell'immagine da pullare se non presente in locale. -w /app definisce la working directory all'interno del container(?). sh -c "yarn install && yarn run dev" sono le istruzioni eseguite nella working dir del container nella sua fase di init una volta avviato.
+
+
+################ COMPOSE #################
+
+docker compose run [OPTIONS] SERVICE [COMMAND] [ARGS...]: just run a command on a docker image without permanently creating a container

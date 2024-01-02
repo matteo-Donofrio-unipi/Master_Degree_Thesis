@@ -1,0 +1,41 @@
+\\1) Avviare la tangle con tutti i container necessari
+	
+	cd Tesi / one-click-tangle-chrysalis / hornet-private-net / 
+	./private-tangle-allen.sh install $1 (param è il numero di secondi che attende prima di runnare docker container)
+	./private-tangle-allen.sh start
+
+DA QUI IN POI, TUTTI I FILE.PY DEVONO ESSERE NELLA STESSA CARTELLA, POICHE CONDIVIDONO FILES COME "lista_msgDB.txt", "PR_df.csv", "Best_Clusters_DF.csv"
+
+2) Impostare la Tangle in ascolto di nuovi messaggi incoming
+	
+	cd iota.rs / bindings / python / examples / Client_code
+	python3 Tangle_analyzer_sing_msgDB.py
+
+3) Caricare messaggi da dataset nella Tangle
+	python3 Tangle_analyzer_sing_msgDB.py
+	$ "LAD"
+
+4) Avviare client per leggere e mandare messaggi sulla Tangle
+	python3 Client_User.py
+	$ "GMBI" => get message by index
+	$ "SM" => send message
+
+5) Calcolare stima veridicità articoli
+	python3 Compute_Statistics.py
+	$ "PR" => page rank
+	
+	python3 Comm_Detec.py
+	
+	python3 Compute_Statistics.py
+	$ "AE" => article estimate
+
+Viene generato un DF contenente, per ogni articolo, la stima di veridicità associata.
+
+
+
+
+	
+	
+
+		
+\cite{antonopoulos2014mastering}
